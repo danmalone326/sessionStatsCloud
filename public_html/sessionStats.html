@@ -6,6 +6,7 @@
 <link rel="apple-touch-icon" href="https://glaarg.org/wp-content/uploads/2018/05/cropped-glaarglogoyellowblack-180x180.jpg" />
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/6.3.1/d3.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3-cloud/1.2.5/d3.layout.cloud.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/seedrandom/3.0.5/seedrandom.min.js"></script>
 
 <script>
 
@@ -80,6 +81,10 @@ function rankColor(sessions) {
 
 // Called when new JSON data is here
 function gotNewStats(stats) {
+
+	// seed the random number generator so we get repeatable patterns
+	Math.seedrandom(JSON.stringify(stats));
+
 	// first find the max and min values
 	var minSessions = 999;
 	var maxSessions = 0;
