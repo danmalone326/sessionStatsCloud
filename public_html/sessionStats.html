@@ -26,8 +26,7 @@ var rotateMax = 45;
 var svgWidth = 1080;
 var svgHeight = 600;
 
-var words = [];
-
+const urlParams = new URLSearchParams(window.location.search);
 
 // Routines for loading the JSON stats file
 var getJSON = function(url, callback) {
@@ -45,16 +44,16 @@ var getJSON = function(url, callback) {
 					xhr.send();
 				};
 
-// Called after the JSON file is loaded
-getJSON(jsonURL,
-		function(err, data) {
-			if (err !== null) {
-				alert('Something went wrong: ' + err);
-			} else {
-				gotNewStats(data);
-			}
-		});
-
+function loadJSON (url) {
+	getJSON(jsonURL,
+			function(err, data) {
+				if (err !== null) {
+					alert('Something went wrong: ' + err);
+				} else {
+					gotNewStats(data);
+				}
+			});
+}
 
 
 var rankColors = [
@@ -79,60 +78,27 @@ function rankColor(sessions) {
 	return rank.color;
 }
 
-// Called when new JSON data is here
-function gotNewStats(stats) {
+function getColor(i,count) {
+	if (urlParams.has("colorful")) {
+		return d3.schemeCategory10[count % d3.schemeCategory10.length];
+	} else {
+		return rankColor(i.sessions);
+	}
+}
 
-	// seed the random number generator so we get repeatable patterns
-	Math.seedrandom(JSON.stringify(stats));
-
-	// first find the max and min values
-	var minSessions = 999;
-	var maxSessions = 0;
-	stats.individual.forEach(function (i) {
-		if (i.sessions > maxSessions) { maxSessions = i.sessions; }
-		if (i.sessions < minSessions) { minSessions = i.sessions; }
-	});
-	
-	// create word entries and compute size, color, and rotation for each VE
-	stats.individual.forEach(function (i) {
-    	var word = {
-    			"text": i.callsign, 
-    			"size": (i.sessions / (maxSessions-minSessions+1) * (fontSizeMax-fontSizeMin))+fontSizeMin,
-    			"color": rankColor(i.sessions),
-    			"rotate": (Math.floor(Math.random() * rotateStops) * (rotateMax-rotateMin) / (rotateStops-1)) + rotateMin,
-			};
-			
-		// Overrides go here
-    	if (i.sessions == maxSessions) {
-    		word["rotate"] = 0;
-    	}
-    	
-    	words.push(word);
-	});
+function wordCloud(selector) {
 
 	// used for random colors if needed
 	//var fill = d3.scale.category20();
+	// 	var fill = d3.schemeSet2();
 
-	// create the new layout parameters
-	var layout = d3.layout.cloud()
-		.size([svgWidth, svgHeight])
-		.words(words)
-		.padding(padding)
-		.rotate(function(d) { return d.rotate; })
-		.font(fontFamily)
-		.fontSize(function(d) { return d.size; })
-		.on("end", draw);
-
-	// build the new layout
-	layout.start();
-	
-	// called when the layout build is complete
+	// called when update completes the layout
 	// this will draw the svg onto the page
 	function draw(words) {
-	  d3.select("#svgWrapperDiv").append("svg")
-		.attr("viewBox", "0 0 "+layout.size()[0]+" "+layout.size()[1])
+	  d3.select(selector).append("svg")
+		.attr("viewBox", "0 0 "+svgWidth+" "+svgHeight)
 		.append("g")
-		.attr("transform", "translate(" + layout.size()[0] / 2 + "," + layout.size()[1] / 2 + ")")
+		.attr("transform", "translate(" + svgWidth / 2 + "," + svgHeight / 2 + ")")
 		.selectAll("text")
 		.data(words)
 		.enter().append("text")
@@ -146,8 +112,123 @@ function gotNewStats(stats) {
 				})
 		.text(function(d) { return d.text; });
 	}
+	
+	// this is basically a public function 'update' for the wordCloud object
+	// call this with an array of word objects with text, size, color, and rotate
+return {
+			update: function(words) {
+				d3.layout.cloud()
+					.size([svgWidth, svgHeight])
+					.words(words)
+					.padding(padding)
+					.rotate(function(d) { return d.rotate; })
+					.font(fontFamily)
+					.fontSize(function(d) { return d.size; })
+					.on("end", draw)
+					.start();
+			}
+		}
+
 }
 
+var myWordCloud = wordCloud("#svgWrapperDiv");
+
+
+function wordsByCallsign(stats) {
+	var words = [];
+
+	// first find the max and min values
+	var minSessions = 999;
+	var maxSessions = 0;
+	stats.individual.forEach(function (i) {
+		if (i.sessions > maxSessions) { maxSessions = i.sessions; }
+		if (i.sessions < minSessions) { minSessions = i.sessions; }
+	});
+	
+	// create word entries and compute size, color, and rotation for each VE
+	stats.individual.forEach(function (i, count) {
+    	var word = {
+    			"text": i.callsign, 
+    			"size": (i.sessions / (maxSessions-minSessions+1) * (fontSizeMax-fontSizeMin))+fontSizeMin,
+    			"color": getColor(i,count),
+    			"rotate": (Math.floor(Math.random() * rotateStops) * (rotateMax-rotateMin) / (rotateStops-1)) + rotateMin,
+			};
+			
+		// Overrides go here
+    	if (i.sessions == maxSessions) {
+    		word["rotate"] = 0;
+    	}
+    	
+    	words.push(word);
+	});
+
+	return words;
+}
+
+function wordsGroupedByName(stats) {
+	var words = [];
+
+	var names = [];
+	stats.individual.forEach(function (i) {
+		var name = i.name;
+		var sessions = i.sessions;
+		
+		var index = names.findIndex(function(value) {
+											return value.name == name;
+										});
+		if (index == -1) {
+			names.push({"name": name, "sessions": sessions})
+		} else {
+			names[index].sessions += sessions;
+		}
+	});
+
+	// first find the max and min values
+	var minSessions = 999;
+	var maxSessions = 0;
+	names.forEach(function (i) {
+		if (i.sessions > maxSessions) { maxSessions = i.sessions; }
+		if (i.sessions < minSessions) { minSessions = i.sessions; }
+	});
+	
+	// create word entries and compute size, color, and rotation for each VE
+	names.forEach(function (i, count) {
+    	var word = {
+    			"text": i.name, 
+    			"size": (i.sessions / (maxSessions-minSessions+1) * (fontSizeMax-fontSizeMin))+fontSizeMin,
+    			"color": getColor(i,count),
+    			"rotate": (Math.floor(Math.random() * rotateStops) * (rotateMax-rotateMin) / (rotateStops-1)) + rotateMin,
+			};
+			
+		// Overrides go here
+    	if (i.sessions == maxSessions) {
+    		word["rotate"] = 0;
+    	}
+    	
+    	words.push(word);
+	});
+
+	return words;
+}
+
+// Called when new JSON data is here
+function gotNewStats(stats) {
+
+	var words = [];
+
+	// seed the random number generator so we get repeatable patterns
+	// pattern will change every time the stats are updated
+	// for now also change the pattern at least every day
+	var d = new Date();
+	Math.seedrandom(JSON.stringify(stats)+d.getUTCDate());
+
+	words = wordsByCallsign(stats);
+
+	myWordCloud.update(words);
+}
+
+// This starts the process
+loadJSON(jsonURL);
 
 </script>
 <style>
