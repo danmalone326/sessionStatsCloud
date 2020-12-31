@@ -1,0 +1,116 @@
+#!/usr/bin/python3
+
+import sys
+import time
+import requests
+import csv
+import re
+import json
+import hashlib
+import os
+
+
+dateString = time.strftime("%Y%m%d-%H%M%S")
+
+csvFile = "data/sessionStats.csv"
+jsonFile = "data/sessionStats.json"
+
+csvURL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRwAUx84RPee6_cVnc4kXnJFTih_j1I1-Iqje0BzqWHNE8BGPROq4_VRuNdPMKAm_dGhaW0AH97aalf/pub?gid=581239928&single=true&output=csv"
+
+
+def myInt(thisString):
+	if (thisString == ''):
+		return 0
+	return int(thisString.replace(',', ''))
+
+
+def jsonDigest(data):
+	jsonString = json.dumps(data, sort_keys=True)
+	return hashlib.md5(jsonString.encode()).hexdigest()
+
+
+def lastJsonDigest():
+	if (os.path.exists(jsonFile)):
+		with open(jsonFile) as infile:
+			data = json.load(infile)
+		return jsonDigest(data)
+	else:
+		return "0"
+
+
+# r = requests.get(csvURL)
+# csvData = r.content
+# r.close()
+# 
+# f = open(csvFile,"w")
+# f.write(csvData)
+# f.close
+
+f = open(csvFile,"r")
+
+csvRows = csv.reader(f)
+
+stats = {}
+
+noneState = 0
+groupState = 1
+individualState = 2
+
+currentState = noneState
+i=0
+for thisRow in csvRows:
+	i+=1
+# 	print(i,end=":")
+# 	print(thisRow)
+	
+	if (currentState == noneState):
+# 		"Total # of VE's = group stats
+# 		'VE List' = individual stats
+		if (thisRow[1].startswith("Total # of VE")):
+			currentState = groupState
+		elif (thisRow[1] == "VE List"):
+			currentState = individualState
+			individualList = []
+			
+	elif (currentState == groupState):
+		groupStats = {
+			"totalVEs": myInt(thisRow[1]),
+			"totalRemoteSessions": myInt(thisRow[2]),
+			"totalInPersonSessions": myInt(thisRow[3]),
+			"totalRemoteExaminees": myInt(thisRow[4]),
+			"totalRemoteElementsPassed": myInt(thisRow[5]),
+		}
+		stats["group"] = groupStats
+		currentState = noneState
+	
+	elif (currentState == individualState):
+		match = re.match('^(\d+\w)-(\S+)\s(.*)$',thisRow[1])
+		individual = {
+			"veNum": match.group(1),
+			"callsign": match.group(2),
+			"name": match.group(3),
+			"sessions": myInt(thisRow[2]),
+			"remoteSessions": myInt(thisRow[3]),
+			"remoteExaminees": myInt(thisRow[4]),
+			"remoteElementsPassed": myInt(thisRow[5]),
+		}
+		individualList.append(individual)
+# 		print (individual)
+		
+		# end state is no more rows
+# 		currentState = noneState
+
+f.close
+
+stats["individual"] = individualList
+
+# print (stats['group']['totalVEs'])
+# print (len(stats['individual']))
+
+currentDigest = jsonDigest(stats)
+lastDigest = lastJsonDigest()
+
+if (currentDigest != lastDigest):
+	print ("Saving updated stats.")
+	with open(jsonFile, 'w') as outfile:
+		json.dump(stats, outfile)

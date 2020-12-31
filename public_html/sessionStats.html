@@ -1,0 +1,166 @@
+<html>
+<head>
+<title>GLAARG Session Stats</title>
+<link rel="icon" href="https://glaarg.org/wp-content/uploads/2018/05/cropped-glaarglogoyellowblack-32x32.jpg" sizes="32x32" />
+<link rel="icon" href="https://glaarg.org/wp-content/uploads/2018/05/cropped-glaarglogoyellowblack-192x192.jpg" sizes="192x192" />
+<link rel="apple-touch-icon" href="https://glaarg.org/wp-content/uploads/2018/05/cropped-glaarglogoyellowblack-180x180.jpg" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/6.3.1/d3.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3-cloud/1.2.5/d3.layout.cloud.min.js"></script>
+
+<script>
+
+var jsonURL = "sessionStats.json"
+
+var fontSizeMin = 12;
+var fontSizeMax = 128;
+
+var fontFamily = "Impact";
+
+var padding = 1;
+
+var rotateStops = 5;  // minimum 2, to make all same rotation, set max=min
+var rotateMin = -45;
+var rotateMax = 45;
+
+var svgWidth = 1600;
+var svgHeight = 900;
+
+var words = [];
+
+
+// Routines for loading the JSON stats file
+var getJSON = function(url, callback) {
+					var xhr = new XMLHttpRequest();
+					xhr.open('GET', url, true);
+					xhr.responseType = 'json';
+					xhr.onload = function() {
+						var status = xhr.status;
+						if (status === 200) {
+							callback(null, xhr.response);
+						} else {
+							callback(status, xhr.response);
+						}
+					};
+					xhr.send();
+				};
+
+// Called after the JSON file is loaded
+getJSON(jsonURL,
+		function(err, data) {
+			if (err !== null) {
+				alert('Something went wrong: ' + err);
+			} else {
+				gotNewStats(data);
+			}
+		});
+
+
+
+var rankColors = [
+	{"rank": 100, "color": "rgb(204, 122, 0)"},
+	{"rank": 50, "color": "rgb(171, 132, 12)"},
+	{"rank": 40, "color": "rgb(0, 121, 121)"},
+	{"rank": 30, "color": "rgb(54, 41, 88)"},
+	{"rank": 20, "color": "rgb(81, 113, 51)"},
+	{"rank": 10, "color": 'rgb(62, 87, 40)'},
+	{"rank": 5, "color": 'rgb(24, 63, 99)'},
+	{"rank": 0, "color": 'rgb(0,0,0)'},
+];
+
+// returns the appropriate color based on the number of sessions
+function rankColor(sessions) {
+	rank = rankColors.find(function (r,i,a) {
+				if(sessions>=r.rank) {
+					return true;
+				}
+				return false;
+		});
+	return rank.color;
+}
+
+// Called when new JSON data is here
+function gotNewStats(stats) {
+	// first find the max and min values
+	var minSessions = 999;
+	var maxSessions = 0;
+	stats.individual.forEach(function (i) {
+		if (i.sessions > maxSessions) { maxSessions = i.sessions; }
+		if (i.sessions < minSessions) { minSessions = i.sessions; }
+	});
+	
+	// create word entries and compute size, color, and rotation for each VE
+	stats.individual.forEach(function (i) {
+    	var word = {
+    			"text": i.callsign, 
+    			"size": (i.sessions / (maxSessions-minSessions+1) * (fontSizeMax-fontSizeMin))+fontSizeMin,
+    			"color": rankColor(i.sessions),
+    			"rotate": (Math.floor(Math.random() * rotateStops) * (rotateMax-rotateMin) / (rotateStops-1)) + rotateMin,
+			};
+			
+		// Overrides go here
+    	if (i.sessions == maxSessions) {
+    		word["rotate"] = 0;
+    	}
+    	
+    	words.push(word);
+	});
+
+	// used for random colors if needed
+	//var fill = d3.scale.category20();
+
+	// create the new layout parameters
+	var layout = d3.layout.cloud()
+		.size([svgWidth, svgHeight])
+		.words(words)
+		.padding(padding)
+		.rotate(function(d) { return d.rotate; })
+		.font(fontFamily)
+		.fontSize(function(d) { return d.size; })
+		.on("end", draw);
+
+	// build the new layout
+	layout.start();
+	
+	// called when the layout build is complete
+	// this will draw the svg onto the page
+	function draw(words) {
+	  d3.select("#svgWrapperDiv").append("svg")
+		.attr("viewBox", "0 0 "+layout.size()[0]+" "+layout.size()[1])
+		.append("g")
+		.attr("transform", "translate(" + layout.size()[0] / 2 + "," + layout.size()[1] / 2 + ")")
+		.selectAll("text")
+		.data(words)
+		.enter().append("text")
+		.style("font-size", function(d) { return d.size + "px"; })
+		.style("font-family", fontFamily)
+// 		.style("fill", function(d, i) { return fill(i); })
+		.style("fill", function(d, i) { return d.color; })
+		.attr("text-anchor", "middle")
+		.attr("transform", function(d) {
+					return "translate(" + [d.x, d.y] + ")rotate(" + d.rotate + ")";
+				})
+		.text(function(d) { return d.text; });
+	}
+}
+
+
+</script>
+<style>
+.svgWrapper {
+}
+.svgWrapper svg {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    top: 0;
+    left: 0;
+}
+</style>
+</head>
+
+<body>
+<div id="svgWrapperDiv" class="svgWrapper"">
+</div>
+</body>
+
+</html>
