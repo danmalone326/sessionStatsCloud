@@ -38,13 +38,13 @@ def lastJsonDigest():
 		return "0"
 
 
-# r = requests.get(csvURL)
-# csvData = r.content
-# r.close()
-# 
-# f = open(csvFile,"w")
-# f.write(csvData)
-# f.close
+r = requests.get(csvURL)
+csvData = r.content
+r.close()
+
+f = open(csvFile,"w")
+f.write(csvData)
+f.close
 
 f = open(csvFile,"r")
 
