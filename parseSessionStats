@@ -42,7 +42,7 @@ r = requests.get(csvURL)
 csvData = r.content
 r.close()
 
-f = open(csvFile,"w")
+f = open(csvFile,"wb")
 f.write(csvData)
 f.close
 
