@@ -1,0 +1,7 @@
+git doesn't handle symbolic links well.
+
+Be sure to create a symbolic link to the json file.
+> ln -s ../data/sessionStats.json .
+
+Also create a symbolic link for index.html if you want.
+> ln -s sessionStats.html index.html
