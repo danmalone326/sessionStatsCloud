@@ -1,0 +1,31 @@
+.outerBox {
+	display: flex;
+    flex-flow: column;
+    height: 100%;
+}
+.headerBox {
+	flex: 0 1 auto;
+}
+.footerBox {
+	flex: 0 1 auto;
+	width: 100%;
+}
+.tooltipTable {
+	table-layout: fixed;
+	width: 75%;
+	text-align: center;
+	margin: auto;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.svgWrapper {
+	flex: 1 1 auto;
+}
+.svgWrapper svg {
+    width: 100%;
+    height: 100%;
+    top: 0;
+    left: 0;
+}
