@@ -5,14 +5,14 @@ var fontSizeMax = 100;
 
 var fontFamily = "Impact";
 
-var padding = 0.2;
+var padding = 0.15;
 
 var rotateStops = 6;  // minimum 2, to make all same rotation, set max=min
 var rotateMin = -45;
 var rotateMax = 45;
 
-var svgWidth = 1080;
-var svgHeight = 600;
+var svgWidth = 1280;
+var svgHeight = 720;
 
 const urlParams = new URLSearchParams(window.location.search);
 
