@@ -7,11 +7,15 @@
 
 <script>
 var jsonURL = "sessionStats.json";
-var inputID = "veInput"
-var outputID = "statsOutput"
+var inputID = "veInput";
+var veCountID = "veCount";
+var roomCountID = "roomCount";
+var showSessionsID = "showSessions";
+var outputID = "statsOutput";
 
 
 window.stats = "";
+window.selectedList = [];
 
 // Routines for loading the JSON stats file
 var getJSON = function(url, callback) {
@@ -50,6 +54,39 @@ function compareBySessionsDec(a,b) {
   	return result;
 }
 
+function redrawTable() {
+	var selectedList = window.selectedList;
+	var roomCount = Number(document.getElementById(roomCountID).value);
+	var showSessions = document.getElementById(showSessionsID).checked;
+	
+	var htmlOutput = "<center><table><tr>";
+	
+	for (let i = 1; i <= roomCount; i++) {
+		htmlOutput += "<th>Room "+i+"</th>";
+	}
+	htmlOutput += "</tr>";
+	
+	selectedList.forEach(function (item, index) {
+		if (index == 0) {
+			htmlOutput += "<tr>";
+		} else if (index%roomCount == 0) {
+			htmlOutput += "</tr><tr>";		
+		}
+		htmlOutput += "<td>";
+		htmlOutput += item.veNum+"-"+item.callsign+" "+item.name;
+		if (showSessions) {
+			htmlOutput += " ("+item.sessions+")";
+		}
+		htmlOutput += "</td>";
+	})
+	
+	htmlOutput += "</tr></table></center>";
+	
+	document.getElementById(outputID).innerHTML = htmlOutput;
+	
+	return true;
+}
+
 function inputChange() {
 	var input = document.getElementById(inputID).value;
 	var inputList = input.split(/\W+/);
@@ -67,19 +104,26 @@ function inputChange() {
 						})
 	
 	selectedList.sort(compareBySessionsDec);
+	window.selectedList = selectedList;
 	
-	var htmlOutput = "<center><table padding=2><tr><th>VE</th><th>Sessions</th></tr>";
-	selectedList.forEach(function (item, index) {
-		htmlOutput += "<tr><td>"+item.callsign+"</td><td>"+item.sessions+"</td></tr>";
-	})
-	htmlOutput += "</table></center>";
+	document.getElementById(veCountID).innerHTML = selectedList.length+" VE"+ (selectedList.length==1 ? "" : "s") +" found";
 	
-	document.getElementById(outputID).innerHTML = htmlOutput;
-	
-	return true;
+	return redrawTable();
 }
 
 </script>
+
+<style type="text/css">
+td {
+    padding:2 15px;
+    white-space: nowrap;
+}
+#statsOutput {
+    width: 100%;
+    overflow-x: auto;
+    white-space: nowrap;
+}
+</style>
 
 </head>
 
@@ -92,10 +136,16 @@ function inputChange() {
 		<div id="inputDiv">
 		<center>
 		<form onsubmit="return false;">
-		<textarea id="veInput" rows="10" cols="30" placeholder="Paste a list of VE #s or Callsigns here..." onchange="inputChange();"></textarea>
-		<br>
-		<br>
-		<button type=button>Go</button>
+			<textarea id="veInput" rows="10" cols="30" placeholder="Paste a list of VE #s or Callsigns here..." onchange="inputChange();"></textarea>
+			<br>
+			<div id=veCount>0 VEs found</div>
+			<br>
+			Rooms: <input type=number id=roomCount value=1 min=1 max=20 onchange="redrawTable();"/>
+			<br>
+			<input type=checkbox id=showSessions checked onchange="redrawTable();"> Show session count
+			<br>
+			<br>
+			<button type=button>Go</button>
 		</form>
 		</center>
 		</div>
