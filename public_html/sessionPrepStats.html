@@ -1,0 +1,107 @@
+<html>
+<head>
+<title>GLAARG Session Stats</title>
+<link rel="icon" href="https://glaarg.org/wp-content/uploads/2018/05/cropped-glaarglogoyellowblack-32x32.jpg" sizes="32x32" />
+<link rel="icon" href="https://glaarg.org/wp-content/uploads/2018/05/cropped-glaarglogoyellowblack-192x192.jpg" sizes="192x192" />
+<link rel="apple-touch-icon" href="https://glaarg.org/wp-content/uploads/2018/05/cropped-glaarglogoyellowblack-180x180.jpg" />
+
+<script>
+var jsonURL = "sessionStats.json";
+var inputID = "veInput"
+var outputID = "statsOutput"
+
+
+window.stats = "";
+
+// Routines for loading the JSON stats file
+var getJSON = function(url, callback) {
+					var xhr = new XMLHttpRequest();
+					xhr.open('GET', url, true);
+					xhr.responseType = 'json';
+					xhr.onload = function() {
+						var status = xhr.status;
+						if (status === 200) {
+							callback(null, xhr.response);
+						} else {
+							callback(status, xhr.response);
+						}
+					};
+					xhr.send();
+				};
+
+function loadJSON () {
+	getJSON(jsonURL,
+			function(err, data) {
+				if (err !== null) {
+					alert('Something went wrong: ' + err);
+				} else {
+					window.stats=data;
+				}
+			});
+}
+
+function compareBySessionsDec(a,b) {
+	var result = 0;
+  	if (a.sessions > b.sessions) {
+		result = -1;
+  	} else if (a.sessions < b.sessions) {
+    	result = 1;
+  	}
+  	return result;
+}
+
+function inputChange() {
+	var input = document.getElementById(inputID).value;
+	var inputList = input.split(/\W+/);
+	var selectedList = [];
+	
+	inputList.forEach(function (inputItem, inputIndex) {
+						   window.stats.individual.forEach(function (statsItem, statsIndex) {
+															  if ((statsItem.veNum == inputItem.toUpperCase()) ||
+															      (statsItem.callsign == inputItem.toUpperCase())) {
+															      	if (!(selectedList.some(function(a){return a.veNum==statsItem.veNum;}))) {
+																		selectedList.push(statsItem);  
+															      	}
+																}
+															})
+						})
+	
+	selectedList.sort(compareBySessionsDec);
+	
+	var htmlOutput = "<center><table padding=2><tr><th>VE</th><th>Sessions</th></tr>";
+	selectedList.forEach(function (item, index) {
+		htmlOutput += "<tr><td>"+item.callsign+"</td><td>"+item.sessions+"</td></tr>";
+	})
+	htmlOutput += "</table></center>";
+	
+	document.getElementById(outputID).innerHTML = htmlOutput;
+	
+	return true;
+}
+
+</script>
+
+</head>
+
+<body onload='document.getElementById("veInput").focus(); loadJSON();'"'>
+	<div class="outerBox">
+		<div class="headerBox">
+		<center><h1>Session Prep Stats</h1></center>
+		</div>
+
+		<div id="inputDiv">
+		<center>
+		<form onsubmit="return false;">
+		<textarea id="veInput" rows="10" cols="30" placeholder="Paste a list of VE #s or Callsigns here..." onchange="inputChange();"></textarea>
+		<br>
+		<br>
+		<button type=button>Go</button>
+		</form>
+		</center>
+		</div>
+
+		<div id="statsOutput">
+		</div>
+	</div>
+</body>
+</html>
