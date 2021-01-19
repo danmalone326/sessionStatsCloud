@@ -1,6 +1,6 @@
 <html>
 <head>
-<title>GLAARG Session Stats</title>
+<title>GLAARG Session Prep</title>
 <link rel="icon" href="https://glaarg.org/wp-content/uploads/2018/05/cropped-glaarglogoyellowblack-32x32.jpg" sizes="32x32" />
 <link rel="icon" href="https://glaarg.org/wp-content/uploads/2018/05/cropped-glaarglogoyellowblack-192x192.jpg" sizes="192x192" />
 <link rel="apple-touch-icon" href="https://glaarg.org/wp-content/uploads/2018/05/cropped-glaarglogoyellowblack-180x180.jpg" />
@@ -17,6 +17,13 @@ var outputID = "statsOutput";
 window.stats = "";
 window.selectedList = [];
 window.maybeList = [];
+
+function checkDisplayWarning() {
+	console.log(document.location.href.includes('glaarg-test'));
+	if (document.location.href.includes('glaarg-test')) {
+		document.getElementById('warning-wrapper').style.display='block';
+	}
+}
 
 // Routines for loading the JSON stats file
 var getJSON = function(url, callback) {
@@ -161,11 +168,40 @@ td {
     overflow-x: auto;
     white-space: nowrap;
 }
+
+#warning-wrapper {
+	display: none;
+	position: absolute;
+	top: 0;
+	left: 0;
+	width: 100%;
+	z-index: 10;
+	background-color: rgba(0,0,0,0.5);
+	padding: 25px;
+}
+#warning {
+	width: 50%;
+	height: auto;
+	margin: 0 auto;
+	padding: 10px;
+	position: relative;
+	text-align: center;
+	background-color: rgb(255,255,0);
+	border-radius: 25px;
+}
+
 </style>
 
 </head>
 
-<body onload='document.getElementById("veInput").focus(); loadJSON();'"'>
+<body onload='checkDisplayWarning(); document.getElementById("veInput").focus(); loadJSON();'"'>
+	<div id=warning-wrapper>
+		<div id=warning>
+			This is the TEST site, probably with OLD data.<br>
+			Production is here: <a href="https://malone.org/glaarg/sessionPrepStats.html">https://malone.org/glaarg/sessionPrepStats.html</a><br>
+			<button type=button onclick='document.getElementById("warning-wrapper").style.display="none"; return true;'>Clear</button>
+		</div>
+	</div>
 	<div class="outerBox">
 		<div class="headerBox">
 		<center><h1>Session Prep Stats</h1></center>
