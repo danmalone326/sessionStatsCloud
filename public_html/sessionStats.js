@@ -181,22 +181,13 @@ function wordsByCallsign(stats) {
 
 	// create word entries and compute size, color, and rotation for each VE
 	stats.forEach(function (i, count) {
-		if (i.overallSessionCount > 0) {
-			// Special code to get first name
-			var firstName = "";
-			if (i.veName.includes(",")) {
-				firstName = i.veName.split(',')[1].trim().split(' ')[0];
-			} else {
-				firstName = i.veName.split(' ')[0].trim();
-			}
-			// end Special code
-		
+		if (i.overallSessionCount > 0) {		
 			var word = {
 					"text": i.veCallSign, 
 					"size": (i.overallSessionCount / (maxSessions-minSessions+1) * (fontSizeMax-fontSizeMin))+fontSizeMin,
 					"color": getColor(i,count),
 					"rotate": (Math.floor(Math.random() * rotateStops) * (rotateMax-rotateMin) / (rotateStops-1)) + rotateMin,
-					"tooltip": [i.veNumber+"-"+i.veCallSign+" "+firstName,
+					"tooltip": [i.veNumber+"-"+i.veCallSign+" "+i.vePreferredName,
 								i.overallSessionCount + " (" + nth(standing[i.overallSessionCount]) + ")",
 								i.remoteSessionCount,
 								i.applicantCount,
@@ -221,22 +212,13 @@ function wordsGroupedByName(stats) {
 	var names = [];
 	stats.forEach(function (i) {
 		if (i.overallSessionCount > 0) {
-			// Special code to get first name
-			var firstName = "";
-			if (i.veName.includes(",")) {
-				firstName = i.veName.split(',')[1].trim().split(' ')[0];
-			} else {
-				firstName = i.veName.split(' ')[0].trim();
-			}
-			// end Special code
-		
 			var index = names.findIndex(function(value) {
-												return value.name == firstName;
+												return value.name == i.vePreferredName;
 											});
 			if (index == -1) {
 				names.push(
 							{
-								"name": firstName,
+								"name": i.vePreferredName,
 								"count": 1, 
 								"overallSessionCount": i.overallSessionCount,
 								"remoteSessions": i.remoteSessionCount,
