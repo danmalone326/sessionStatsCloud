@@ -1,4 +1,6 @@
-var jsonURL = "sessionStats.json"
+
+var jsonURL = "https://glaarglookup.n1cck.com/websiteStatsDetail"
+// var jsonURL = "sessionStats.json"
 
 var fontSizeMin = 10;
 var fontSizeMax = 100;
@@ -72,7 +74,7 @@ function getColor(i,count) {
 	if (urlParams.has("colorful")) {
 		return d3.schemeCategory10[count % d3.schemeCategory10.length];
 	} else {
-		return rankColor(i.sessions);
+		return rankColor(i.overallSessionCount);
 	}
 }
 
@@ -152,30 +154,62 @@ var myWordCloud = wordCloud("#svgWrapperDiv");
 function wordsByCallsign(stats) {
 	var words = [];
 
-	// first find the max and min values
+	// first find the max and min values and standings
+	var standing = {};
 	var minSessions = 999;
 	var maxSessions = 0;
-	stats.individual.forEach(function (i) {
-		if (i.sessions > maxSessions) { maxSessions = i.sessions; }
-		if (i.sessions < minSessions) { minSessions = i.sessions; }
+	stats.forEach(function (i) {
+		if (i.overallSessionCount > maxSessions) { maxSessions = i.overallSessionCount; }
+		if (i.overallSessionCount < minSessions) { minSessions = i.overallSessionCount; }
+		if (i.overallSessionCount in standing) {standing[i.overallSessionCount]+=1} else {standing[i.overallSessionCount]=1}
 	});
 	
+	// Needed a reverse sort, but this was easier
+	var tempArray = [];
+	for (var key in standing) {
+		tempArray.push(key);
+	}
+	
+	var currentStanding=1;
+	while (tempArray.length) {
+		key = tempArray.pop();
+		temp = standing[key];
+		standing[key] = currentStanding;
+		currentStanding += temp;
+	}
+	// end of standings	
+
 	// create word entries and compute size, color, and rotation for each VE
-	stats.individual.forEach(function (i, count) {
-    	var word = {
-    			"text": i.callsign, 
-    			"size": (i.sessions / (maxSessions-minSessions+1) * (fontSizeMax-fontSizeMin))+fontSizeMin,
-    			"color": getColor(i,count),
-    			"rotate": (Math.floor(Math.random() * rotateStops) * (rotateMax-rotateMin) / (rotateStops-1)) + rotateMin,
-    			"tooltip": [i.veNum+"-"+i.callsign+" "+i.name,i.sessions,i.remoteSessions,i.remoteExaminees,i.remoteElementsPassed].join(),
-			};
+	stats.forEach(function (i, count) {
+		if (i.overallSessionCount > 0) {
+			// Special code to get first name
+			var firstName = "";
+			if (i.veName.includes(",")) {
+				firstName = i.veName.split(',')[1].trim().split(' ')[0];
+			} else {
+				firstName = i.veName.split(' ')[0].trim();
+			}
+			// end Special code
+		
+			var word = {
+					"text": i.veCallSign, 
+					"size": (i.overallSessionCount / (maxSessions-minSessions+1) * (fontSizeMax-fontSizeMin))+fontSizeMin,
+					"color": getColor(i,count),
+					"rotate": (Math.floor(Math.random() * rotateStops) * (rotateMax-rotateMin) / (rotateStops-1)) + rotateMin,
+					"tooltip": [i.veNumber+"-"+i.veCallSign+" "+firstName,
+								i.overallSessionCount + " (" + nth(standing[i.overallSessionCount]) + ")",
+								i.remoteSessionCount,
+								i.applicantCount,
+								i.newLicenses+i.newUpgrades].join(),
+				};
 			
-		// Overrides go here
-    	if (i.sessions == maxSessions) {
-    		word["rotate"] = 0;
-    	}
-    	
-    	words.push(word);
+			// Overrides go here
+			if (i.overallSessionCount == maxSessions) {
+				word["rotate"] = 0;
+			}
+		
+			words.push(word);
+		}
 	});
 
 	return words;
@@ -185,51 +219,82 @@ function wordsGroupedByName(stats) {
 	var words = [];
 
 	var names = [];
-	stats.individual.forEach(function (i) {
-		var index = names.findIndex(function(value) {
-											return value.name == i.name;
-										});
-		if (index == -1) {
-			names.push(
-						{
-							"name": i.name,
-							"count": 1, 
-							"sessions": i.sessions,
-							"remoteSessions": i.remoteSessions,
-							"remoteExaminees": i.remoteExaminees,
-							"remoteElementsPassed": i.remoteElementsPassed,
-						}
-					)
-		} else {
-			names[index].count += 1;
-			names[index].sessions += i.sessions;
-			names[index].remoteSessions += i.remoteSessions;
-			names[index].remoteExaminees += i.remoteExaminees;
-			names[index].remoteElementsPassed += i.remoteElementsPassed;
+	stats.forEach(function (i) {
+		if (i.overallSessionCount > 0) {
+			// Special code to get first name
+			var firstName = "";
+			if (i.veName.includes(",")) {
+				firstName = i.veName.split(',')[1].trim().split(' ')[0];
+			} else {
+				firstName = i.veName.split(' ')[0].trim();
+			}
+			// end Special code
+		
+			var index = names.findIndex(function(value) {
+												return value.name == firstName;
+											});
+			if (index == -1) {
+				names.push(
+							{
+								"name": firstName,
+								"count": 1, 
+								"overallSessionCount": i.overallSessionCount,
+								"remoteSessions": i.remoteSessionCount,
+								"remoteExaminees": i.applicantCount,
+								"remoteElementsPassed": i.newLicenses+i.newUpgrades,
+							}
+						)
+			} else {
+				names[index].count += 1;
+				names[index].overallSessionCount += i.overallSessionCount;
+				names[index].remoteSessions += i.remoteSessionCount;
+				names[index].remoteExaminees += i.applicantCount;
+				names[index].remoteElementsPassed += i.newLicenses+i.newUpgrades;
+			}
 		}
 	});
 
-	// first find the max and min values
+	// first find the max and min values and standings
+	var standing = {};
 	var minSessions = 999;
 	var maxSessions = 0;
 	names.forEach(function (i) {
-		if (i.sessions > maxSessions) { maxSessions = i.sessions; }
-		if (i.sessions < minSessions) { minSessions = i.sessions; }
+		if (i.overallSessionCount > maxSessions) { maxSessions = i.overallSessionCount; }
+		if (i.overallSessionCount < minSessions) { minSessions = i.overallSessionCount; }
+		if (i.overallSessionCount in standing) {standing[i.overallSessionCount]+=1} else {standing[i.overallSessionCount]=1}
 	});
 	
+	// Needed a reverse sort, but this was easier
+	var tempArray = [];
+	for (var key in standing) {
+		tempArray.push(key);
+	}
+	
+	var currentStanding=1;
+	while (tempArray.length) {
+		key = tempArray.pop();
+		temp = standing[key];
+		standing[key] = currentStanding;
+		currentStanding += temp;
+	}
+	// end of standings	
+
 	// create word entries and compute size, color, and rotation for each VE
 	names.forEach(function (i, count) {
     	var word = {
     			"text": i.name, 
-    			"size": (i.sessions / (maxSessions-minSessions+1) * (fontSizeMax-fontSizeMin))+fontSizeMin,
+    			"size": (i.overallSessionCount / (maxSessions-minSessions+1) * (fontSizeMax-fontSizeMin))+fontSizeMin,
     			"color": getColor(i,count),
     			"rotate": (Math.floor(Math.random() * rotateStops) * (rotateMax-rotateMin) / (rotateStops-1)) + rotateMin,
-    			"tooltip": "",
-   				"tooltip": [i.count+" "+i.name+" VE"+(i.count!==1?"s":""),i.sessions,i.remoteSessions,i.remoteExaminees,i.remoteElementsPassed].join(),
+   				"tooltip": [i.count+" "+i.name+" VE"+(i.count!==1?"s":""),
+   				            i.overallSessionCount + " (" + nth(standing[i.overallSessionCount]) + ")",
+   				            i.remoteSessions,
+   				            i.remoteExaminees,
+   				            i.remoteElementsPassed].join(),
 			};
 			
 		// Overrides go here
-    	if (i.sessions == maxSessions) {
+    	if (i.overallSessionCount == maxSessions) {
     		word["rotate"] = 0;
     	}
     	
@@ -237,6 +302,16 @@ function wordsGroupedByName(stats) {
 	});
 
 	return words;
+}
+
+function nth(d) {
+	if (d > 3 && d < 21) return d+'th';
+	switch (d % 10) {
+    	case 1:  return d+"st";
+    	case 2:  return d+"nd";
+    	case 3:  return d+"rd";
+    default: return d+"th";
+  }
 }
 
 // Called when new JSON data is here

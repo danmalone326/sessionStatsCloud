@@ -111,6 +111,6 @@ currentDigest = jsonDigest(stats)
 lastDigest = lastJsonDigest()
 
 if (currentDigest != lastDigest):
-	print ("Saving updated stats.")
+# 	print ("Saving updated stats.")
 	with open(jsonFile, 'w') as outfile:
 		json.dump(stats, outfile)
