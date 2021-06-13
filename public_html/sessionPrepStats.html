@@ -6,7 +6,8 @@
 <link rel="apple-touch-icon" href="https://glaarg.org/wp-content/uploads/2018/05/cropped-glaarglogoyellowblack-180x180.jpg" />
 
 <script>
-var jsonURL = "sessionStats.json";
+var jsonURL = "https://glaarglookup.n1cck.com/websiteStatsDetail"
+// var jsonURL = "sessionStats.json";
 var inputID = "veInput";
 var veCountID = "veCount";
 var roomCountID = "roomCount";
@@ -82,9 +83,9 @@ function redrawTable() {
 			htmlOutput += "</tr><tr>";		
 		}
 		htmlOutput += "<td>";
-		htmlOutput += item.veNum+"-"+item.callsign+" "+item.name;
+		htmlOutput += item.veNumber+"-"+item.veCallSign+" "+item.vePreferredName;
 		if (showSessions) {
-			htmlOutput += " ("+item.sessions+")";
+			htmlOutput += " ("+item.overallSessionCount+")";
 		}
 		htmlOutput += "</td>";
 	})
@@ -123,18 +124,20 @@ function inputChange() {
 	var maybeList = [];
 	
 	inputList.forEach(function (inputItem, inputIndex) {
-							var matched = false;
-							window.stats.individual.forEach(function (statsItem, statsIndex) {
-															  if ((statsItem.veNum == inputItem.toUpperCase()) ||
-															      (statsItem.callsign == inputItem.toUpperCase())) {
-																	matched = true;
-																	selectedList.push(statsItem);
-																}
-															});
-							if (!matched) {
-								// Does this look like a callsign or a VE Number?
-								if (inputItem.toUpperCase().match(/^(\d{4}[EG]|[A-Z]{1,2}\d[A-Z]{1,3})$/)) {
-									maybeList.push(inputItem.toUpperCase());
+							if (inputItem) {
+								var matched = false;
+								window.stats.forEach(function (statsItem, statsIndex) {
+														  if ((statsItem.veNumber == inputItem.toUpperCase()) ||
+															  (statsItem.veCallSign == inputItem.toUpperCase())) {
+																matched = true;
+																selectedList.push(statsItem);
+															}
+														});
+								if (!matched) {
+									// Does this look like a callsign or a VE Number?
+									if (inputItem.toUpperCase().match(/^(\d{4}[EG]|[A-Z]{1,2}\d[A-Z]{1,3})$/)) {
+										maybeList.push(inputItem.toUpperCase());
+									}
 								}
 							}
 						})
