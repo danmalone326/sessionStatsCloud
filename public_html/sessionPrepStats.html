@@ -12,15 +12,27 @@ var inputID = "veInput";
 var veCountID = "veCount";
 var roomCountID = "roomCount";
 var showSessionsID = "showSessions";
+var veDataListID = "veDataList";
+
+var assignmentDivID = "roomAssignmentDiv";
+var assignmentNumberPrefix = "assignmentNumber";
+var assignmentRoomPrefix = "assignmentRoom";
+var assignmentDataListID = "assignmentDataList";
+
+var specialRoomInputID = "specialRoomInput";
+var specialRoomDataListID = "specialRoomDataList";
+
 var outputID = "statsOutput";
 
 
 window.stats = "";
 window.selectedList = [];
 window.maybeList = [];
+window.roomAssignments = [];
+window.specialRooms = ['Main','Welcome','Precheck','Ready'];
 
 function checkDisplayWarning() {
-	console.log(document.location.href.includes('glaarg-test'));
+// 	console.log(document.location.href.includes('glaarg-test'));
 	if (document.location.href.includes('glaarg-test')) {
 		document.getElementById('warning-wrapper').style.display='block';
 	}
@@ -77,18 +89,20 @@ function redrawTable() {
 	htmlOutput += "</tr>";
 	
 	selectedList.forEach(function (item, index) {
-		if (index == 0) {
-			htmlOutput += "<tr>";
-		} else if (index%roomCount == 0) {
-			htmlOutput += "</tr><tr>";		
+		if (!veHasSpecialAssignment(item.veNumber)) {
+			if (index == 0) {
+				htmlOutput += "<tr>";
+			} else if (index%roomCount == 0) {
+				htmlOutput += "</tr><tr>";		
+			}
+			htmlOutput += "<td>";
+			htmlOutput += item.veNumber+"-"+item.veCallSign+" "+item.vePreferredName;
+			if (showSessions) {
+				htmlOutput += " ("+item.overallSessionCount+")";
+			}
+			htmlOutput += "</td>";
 		}
-		htmlOutput += "<td>";
-		htmlOutput += item.veNumber+"-"+item.veCallSign+" "+item.vePreferredName;
-		if (showSessions) {
-			htmlOutput += " ("+item.overallSessionCount+")";
-		}
-		htmlOutput += "</td>";
-	})
+	});
 	
 	htmlOutput += "</tr>";
 
@@ -114,7 +128,6 @@ function redrawTable() {
 	
 	document.getElementById(outputID).innerHTML = htmlOutput;
 	
-	return true;
 }
 
 function inputChange() {
@@ -156,7 +169,125 @@ function inputChange() {
 	countText += (maybeList.length==0?"": " plus "+maybeList.length+" possible new VE"+ (maybeList.length==1 ? "" : "s") );
 	document.getElementById(veCountID).innerHTML = countText;
 	
-	return redrawTable();
+	var dataList = document.getElementById(assignmentDataListID);
+	dataList.innerHTML = null;
+	for (var i in selectedList) {
+		var choice = selectedList[i].veNumber+"-"+selectedList[i].veCallSign+" "+selectedList[i].vePreferredName;
+		var op=document.createElement("option"); 
+		op.setAttribute("label",choice);
+		op.setAttribute("value",choice); 
+		dataList.appendChild(op);
+	}
+	
+	roomAssignmentsUpdated(); // will remove VEs from special assignments if they have been removed from VE List
+	redrawTable();
+
+	return true;
+}
+
+function veIsParticipating(veNumber) {
+	var result = false;
+	window.selectedList.some(function (item, index) {
+		if (item.veNumber === veNumber) {
+			result = true;
+		}
+		return result;  // this is for the "some"
+	});
+	return result; // this is for the function
+}
+
+function veHasSpecialAssignment(veNumber) {
+	var result = false;
+	window.roomAssignments.some(function (item, index) {
+		if (item.veNumber === veNumber) {
+			result = true;
+		}
+		return result;  // this is for the "some"
+	});
+	return result; // this is for the function)
+}
+
+function roomAssignmentsUpdated() {
+	var count=0;
+	var roomAssignments = [];
+	while (document.getElementById(assignmentNumberPrefix+count.toString()) !== null) {
+		var veDisplay = document.getElementById(assignmentNumberPrefix+count.toString()).value;
+		var veNumber = veDisplay.split("-")[0];
+		var room = document.getElementById(assignmentRoomPrefix+count.toString()).value;
+		var assignment = {"veNumber": veNumber, "veDisplay": veDisplay, "room": room};
+		if (veIsParticipating(veNumber)) {
+			roomAssignments.push(assignment);
+		}
+		count += 1;
+	}
+	window.roomAssignments = roomAssignments;
+	displayRoomAssignments();
+	redrawTable();
+	
+	return true;
+}
+
+function removeAssignment(inputIndex) {
+	document.getElementById(assignmentNumberPrefix+inputIndex.toString()).value=null;
+	roomAssignmentsUpdated();
+}
+
+function displayRoomAssignments() {
+	var innerHTML = "";
+	
+	innerHTML += "<table><tr><th>VE</th><th>Room</th><th></th><tr>";
+	var count = 0;
+	for (var index in window.roomAssignments) {
+		assignment = window.roomAssignments[index];
+		innerHTML += "<tr>"
+		innerHTML += "<td><input id='"+assignmentNumberPrefix+count.toString()+"' value='"+assignment["veDisplay"]+"' list='"+assignmentDataListID+"' onchange='roomAssignmentsUpdated();'></td>";
+		innerHTML += "<td><input id='"+assignmentRoomPrefix+count.toString()+"' value='"+assignment["room"]+"' list='"+specialRoomDataListID+"' onchange='roomAssignmentsUpdated();'></td>";
+		innerHTML += "<td><p onclick='removeAssignment("+count.toString()+")'>Remove</p></td>";
+		innerHTML += "</tr>";
+		count += 1;
+	}
+	innerHTML += "<tr>"
+	innerHTML += "<td><input id="+assignmentNumberPrefix+count.toString()+" list='"+assignmentDataListID+"' onchange='roomAssignmentsUpdated();'></td>";
+	innerHTML += "<td><input id="+assignmentRoomPrefix+count.toString()+" list='"+specialRoomDataListID+"' onchange='roomAssignmentsUpdated();'></td>";
+	innerHTML += "</tr>";
+	innerHTML += "</table>";
+	
+	document.getElementById(assignmentDivID).innerHTML = innerHTML;
+
+// var assignmentNumberPrefix = "assignmentNumber";
+// var assignmentRoomPrefix = "assignmentRoom";
+}
+
+function specialRoomListUpdated() {
+	var input = document.getElementById(specialRoomInputID).value;
+	var roomList = input.split(/\W+/);
+	window.specialRooms = roomList;
+	
+	var dataList = document.getElementById(specialRoomDataListID);
+	dataList.innerHTML = null;
+// 	for (var i=0; i<dataList.options.length; i++) {
+// 		dataList.options[i].remove();
+// 	}
+	for (var room in roomList) {
+		var op=document.createElement("option"); 
+		op.setAttribute("label",roomList[room]);
+		op.setAttribute("value",roomList[room]); 
+		dataList.appendChild(op);
+	}
+}
+
+function displaySpecialRoomList() {
+	document.getElementById(specialRoomInputID).value = window.specialRooms.join("\n");
+}
+
+function onLoad() {
+	loadJSON();
+	checkDisplayWarning(); 
+	displaySpecialRoomList();
+	specialRoomListUpdated(); // need to do this to initialize the dropdown datalist
+	displayRoomAssignments();
+	document.getElementById("veInput").focus(); 
+	return true;
 }
 
 </script>
@@ -193,11 +324,23 @@ td {
 	border-radius: 25px;
 }
 
+.column {
+  float: left;
+  width: 33.33%;
+}
+
+/* Clear floats after the columns */
+.row:after {
+  content: "";
+  display: table;
+  clear: both;
+}
+
 </style>
 
 </head>
 
-<body onload='checkDisplayWarning(); document.getElementById("veInput").focus(); loadJSON();'"'>
+<body onload='onLoad();'>
 	<div id=warning-wrapper>
 		<div id=warning>
 			This is the TEST site, probably with OLD data.<br>
@@ -205,14 +348,17 @@ td {
 			<button type=button onclick='document.getElementById("warning-wrapper").style.display="none"; return true;'>Clear</button>
 		</div>
 	</div>
-	<div class="outerBox">
-		<div class="headerBox">
-		<center><h1>Session Prep Stats</h1></center>
-		</div>
 
-		<div id="inputDiv">
+	<div class="headerBox">
+	<center><h1>Session Prep Stats</h1></center>
+	</div>
+
+	<form onsubmit="return false;">
+
+	<div class="outerBox row">
+		<div id="inputDiv" class="column">
 		<center>
-		<form onsubmit="return false;">
+			<h2>VE List</h2>
 			<textarea id="veInput" rows="10" cols="30" placeholder="Paste a list of VE #s or Callsigns here..." onchange="inputChange();"></textarea>
 			<br>
 			<div id=veCount>0 VEs found</div>
@@ -220,15 +366,40 @@ td {
 			Rooms: <input type=number id=roomCount value=1 min=1 max=20 onchange="redrawTable();"/>
 			<br>
 			<input type=checkbox id=showSessions checked onchange="redrawTable();"> Show session count
-			<br>
-			<br>
-			<button type=button>Go</button>
-		</form>
 		</center>
 		</div>
-
-		<div id="statsOutput">
+		
+		<div id="roomAssignmentOuterDiv" class="column">
+			<center>
+			<h2>Special Room Assignments</h2>
+			
+			<div id="roomAssignmentDiv">
+			</div>
+			</center>
 		</div>
+		
+		<div id="specialRoomsDiv" class="column">
+			<center>
+			<h2>Special Rooms</h2>
+			<textarea id="specialRoomInput" rows="10" cols="30" placeholder="Paste a list of special rooms here..." onchange="specialRoomListUpdated();"></textarea>
+			</center>
+		</div>
+		
+	</div>
+
+	<datalist id="specialRoomDataList">	</datalist>
+	<datalist id="assignmentDataList">	</datalist>
+
+	<div>
+		<center>
+			<button type=button>Go</button>
+		</center>
+	</div>
+
+	</form>
+
+
+	<div id="statsOutput">
 	</div>
 </body>
 </html>
