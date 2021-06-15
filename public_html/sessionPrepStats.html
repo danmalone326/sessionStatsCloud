@@ -18,9 +18,13 @@ var assignmentDivID = "roomAssignmentDiv";
 var assignmentNumberPrefix = "assignmentNumber";
 var assignmentRoomPrefix = "assignmentRoom";
 var assignmentDataListID = "assignmentDataList";
+var assignmentNumberWidth = 30;
+var assignmentRoomWidth = 15;
 
 var specialRoomInputID = "specialRoomInput";
 var specialRoomDataListID = "specialRoomDataList";
+
+var loadDataFileNameID = "loadDataFileName";
 
 var outputID = "statsOutput";
 
@@ -88,11 +92,12 @@ function redrawTable() {
 	}
 	htmlOutput += "</tr>";
 	
+	var count=0;
 	selectedList.forEach(function (item, index) {
 		if (!veHasSpecialAssignment(item.veNumber)) {
-			if (index == 0) {
+			if (count == 0) {
 				htmlOutput += "<tr>";
-			} else if (index%roomCount == 0) {
+			} else if (count%roomCount == 0) {
 				htmlOutput += "</tr><tr>";		
 			}
 			htmlOutput += "<td>";
@@ -101,6 +106,7 @@ function redrawTable() {
 				htmlOutput += " ("+item.overallSessionCount+")";
 			}
 			htmlOutput += "</td>";
+			count += 1;
 		}
 	});
 	
@@ -240,15 +246,15 @@ function displayRoomAssignments() {
 	for (var index in window.roomAssignments) {
 		assignment = window.roomAssignments[index];
 		innerHTML += "<tr>"
-		innerHTML += "<td><input id='"+assignmentNumberPrefix+count.toString()+"' value='"+assignment["veDisplay"]+"' list='"+assignmentDataListID+"' onchange='roomAssignmentsUpdated();'></td>";
-		innerHTML += "<td><input id='"+assignmentRoomPrefix+count.toString()+"' value='"+assignment["room"]+"' list='"+specialRoomDataListID+"' onchange='roomAssignmentsUpdated();'></td>";
+		innerHTML += "<td><input id='"+assignmentNumberPrefix+count.toString()+"' value='"+assignment["veDisplay"]+"' list='"+assignmentDataListID+"' size="+assignmentNumberWidth+" onchange='roomAssignmentsUpdated();'></td>";
+		innerHTML += "<td><input id='"+assignmentRoomPrefix+count.toString()+"' value='"+assignment["room"]+"' list='"+specialRoomDataListID+"' size="+assignmentRoomWidth+" onchange='roomAssignmentsUpdated();'></td>";
 		innerHTML += "<td><p onclick='removeAssignment("+count.toString()+")'>Remove</p></td>";
 		innerHTML += "</tr>";
 		count += 1;
 	}
 	innerHTML += "<tr>"
-	innerHTML += "<td><input id="+assignmentNumberPrefix+count.toString()+" list='"+assignmentDataListID+"' onchange='roomAssignmentsUpdated();'></td>";
-	innerHTML += "<td><input id="+assignmentRoomPrefix+count.toString()+" list='"+specialRoomDataListID+"' onchange='roomAssignmentsUpdated();'></td>";
+	innerHTML += "<td><input id="+assignmentNumberPrefix+count.toString()+" list='"+assignmentDataListID+"' size="+assignmentNumberWidth+" onchange='roomAssignmentsUpdated();'></td>";
+	innerHTML += "<td><input id="+assignmentRoomPrefix+count.toString()+" list='"+specialRoomDataListID+"' size="+assignmentRoomWidth+" onchange='roomAssignmentsUpdated();'></td>";
 	innerHTML += "</tr>";
 	innerHTML += "</table>";
 	
@@ -278,6 +284,63 @@ function specialRoomListUpdated() {
 
 function displaySpecialRoomList() {
 	document.getElementById(specialRoomInputID).value = window.specialRooms.join("\n");
+}
+
+function saveData() {
+	var data = {"veInput": document.getElementById(inputID).value,
+				"roomCount": document.getElementById(roomCountID).value,
+				"showSessions": document.getElementById(showSessionsID).checked,
+				"roomAssignments": window.roomAssignments,
+				"specialRoomInput": document.getElementById(specialRoomInputID).value,
+				};
+	var jsonData = [JSON.stringify(data)];
+	var blobData = new Blob(jsonData, { type: "text/plain;charset=utf-8" });
+	
+	var defaultFileName = "sessionSetup.json";
+	
+	//Check the Browser.
+	var isIE = false || !!document.documentMode;
+	if (isIE) {
+		alert("Internet Explorer not supported.");
+	} else {
+		var url = window.URL || window.webkitURL;
+		link = url.createObjectURL(blobData);
+		var a = document.createElement("a");
+		a.download = defaultFileName;
+		a.href = link;
+		document.body.appendChild(a);
+		a.click();
+		document.body.removeChild(a);
+	}
+}
+
+//loadDataFileName
+function loadData() {
+	var fileSelector = document.getElementById(loadDataFileNameID);
+	
+	fileSelector.value = "";
+	fileSelector.click();
+}
+
+function dataFileNameUpdated () {
+	var fileSelector = document.getElementById(loadDataFileNameID);
+
+  if (fileSelector.value.length != 0) {
+    var file = fileSelector.files[0];
+    var reader = new FileReader();
+    
+    reader.readAsBinaryString(file);
+    reader.onloadend = function() {
+		var data = JSON.parse(reader.result);
+		document.getElementById(inputID).value = data["veInput"];
+		document.getElementById(specialRoomInputID).value = data["specialRoomInput"];
+		document.getElementById(roomCountID).value = data["roomCount"];
+		document.getElementById(showSessionsID).checked = data["showSessions"];
+		window.roomAssignments = data["roomAssignments"];
+		displayRoomAssignments();
+		inputChange();
+	}
+  }	
 }
 
 function onLoad() {
@@ -350,7 +413,7 @@ td {
 	</div>
 
 	<div class="headerBox">
-	<center><h1>Session Prep Stats</h1></center>
+	<center><h1>Session Prep</h1></center>
 	</div>
 
 	<form onsubmit="return false;">
@@ -389,10 +452,15 @@ td {
 
 	<datalist id="specialRoomDataList">	</datalist>
 	<datalist id="assignmentDataList">	</datalist>
+	<input type=file id="loadDataFileName" style="display:none;" onchange="dataFileNameUpdated();">
 
 	<div>
 		<center>
+<!-- 
 			<button type=button>Go</button>
+ -->
+			<button onclick="saveData()">Save Setup</button>
+			<button onclick="loadData()">Load Setup</button>
 		</center>
 	</div>
 
