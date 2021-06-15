@@ -248,13 +248,14 @@ function displayRoomAssignments() {
 		innerHTML += "<tr>"
 		innerHTML += "<td><input id='"+assignmentNumberPrefix+count.toString()+"' value='"+assignment["veDisplay"]+"' list='"+assignmentDataListID+"' size="+assignmentNumberWidth+" onchange='roomAssignmentsUpdated();'></td>";
 		innerHTML += "<td><input id='"+assignmentRoomPrefix+count.toString()+"' value='"+assignment["room"]+"' list='"+specialRoomDataListID+"' size="+assignmentRoomWidth+" onchange='roomAssignmentsUpdated();'></td>";
-		innerHTML += "<td><p onclick='removeAssignment("+count.toString()+")'>Remove</p></td>";
+		innerHTML += "<td><p onclick='removeAssignment("+count.toString()+")' style='cursor:default;'>&#x2715;</p></td>";
 		innerHTML += "</tr>";
 		count += 1;
 	}
 	innerHTML += "<tr>"
 	innerHTML += "<td><input id="+assignmentNumberPrefix+count.toString()+" list='"+assignmentDataListID+"' size="+assignmentNumberWidth+" onchange='roomAssignmentsUpdated();'></td>";
 	innerHTML += "<td><input id="+assignmentRoomPrefix+count.toString()+" list='"+specialRoomDataListID+"' size="+assignmentRoomWidth+" onchange='roomAssignmentsUpdated();'></td>";
+	innerHTML += "<td><p style='visibility:hidden;'>&#x2715;</p></td>";
 	innerHTML += "</tr>";
 	innerHTML += "</table>";
 	
