@@ -186,15 +186,26 @@ function coresFrnSearchHTML(frn) {
 }
 
 function outputApplicants() {
+	var frnList = [];
+	var frnDupe = false;
 	var htmlOutput = "";
 
 	htmlOutput += "<center>";
 	htmlOutput += "<hr>";
 
 	window.sessionData.applicants.forEach(function (item, index) {
+		if (frnList.includes(item.frn)) {
+			frnDupe = true;
+		} else {
+			frnDupe = false;
+			frnList.push(item.frn);
+		}
 		htmlOutput += "PIN: " + item.pin;
 		htmlOutput += " FRN: " + item.frn;
 		htmlOutput += (item.callsign ? " Callsign: " + item.callsign : "");
+		if (frnDupe) {
+			htmlOutput += " <span style=\"color:red\">DUPE</span> ";
+		}
 		htmlOutput += "<br>";
 		var divID = applicantCheckIDPrefix + item.pin;
 		htmlOutput += "<div id=\"" + divID +"\"> </div>";
