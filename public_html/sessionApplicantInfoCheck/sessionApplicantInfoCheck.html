@@ -210,7 +210,7 @@ function outputApplicants() {
 		var divID = applicantCheckIDPrefix + item.pin;
 		htmlOutput += "<div id=\"" + divID +"\"> </div>";
 
-		if (item.callsign !== null) {
+		if (item.callsign) {
 			loadApplicantByCallsign(item.callsign, divID);
 		} else {
 			htmlOutput += "Name: " + item.lastname + ", " + item.firstname + " " + item.middle + "<br>";
