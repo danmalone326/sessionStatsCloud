@@ -105,7 +105,10 @@ function compareDataHTML(attributeName,applicationValue,fccValue) {
 	if (applicationValue === fccValue) {
 		status = "match";
 	} else if ((applicationValue.toUpperCase() === fccValue.toUpperCase()) ||
-			   (applicationValue.replace(/-/,"") === fccValue.replace(/-/,""))) {
+			   ((attributeName == "Zip") && 
+			    ((applicationValue.replace(/-/,"") === fccValue.replace(/-/,"")) || 
+				 (applicationValue.substring(0,3) === fccValue.substring(0,3))))
+			   ) {
 		status = "similar";
 	} else {
 		status = "different";
