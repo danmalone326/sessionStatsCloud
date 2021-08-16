@@ -1,0 +1,337 @@
+<html>
+<head>
+<title>GLAARG Session Applicant Info Check</title>
+<link rel="icon" href="https://glaarg.org/wp-content/uploads/2018/05/cropped-glaarglogoyellowblack-32x32.jpg" sizes="32x32" />
+<link rel="icon" href="https://glaarg.org/wp-content/uploads/2018/05/cropped-glaarglogoyellowblack-192x192.jpg" sizes="192x192" />
+<link rel="apple-touch-icon" href="https://glaarg.org/wp-content/uploads/2018/05/cropped-glaarglogoyellowblack-180x180.jpg" />
+
+<script>
+// https://exam.tools/api/uls/lookup/$callsign
+// https://exam.tools/api/uls/lookup/$frn
+// https://apps.fcc.gov/coresWeb/simpleSearch.do
+// https://apps.fcc.gov/coresWeb/searchDetail.do?frn=$FRN
+
+var etApplicantLookupURLPrefix = "https://exam.tools/api/uls/lookup/";
+var coresApplicantLookupURL = "https://apps.fcc.gov/coresWeb/simpleSearch.do?btnSearch=true";
+
+var coresFormPrefix = "coresLookup";
+var coresPopupTarget = "CORES Popup";
+
+var loadDataFileNameID = "loadDataFileName";
+var outputID = "outputDiv";
+var applicantCheckIDPrefix = "applicantCheck"; // append PIN to this
+
+window.sessionData = [];
+
+function checkDisplayWarning() {
+// 	console.log(document.location.href.includes('glaarg-test'));
+	if (document.location.href.includes('glaarg-test')) {
+		document.getElementById('warning-wrapper').style.display='block';
+	}
+}
+
+// Routines for loading JSON results
+function getJSON(url, callback) {
+	var xhr = new XMLHttpRequest();
+	xhr.open('GET', url, true);
+	xhr.responseType = 'json';
+	xhr.onload = function() {
+		var status = xhr.status;
+		if (status === 200) {
+			callback(null, xhr.response);
+		} else {
+			callback(status, xhr.response);
+		}
+	};
+	xhr.send();
+};
+
+// Routines for loading JSON results via a POST
+// data is a dictionary of form parameters
+function postJSON(url, data, callback) {
+	var xhr = new XMLHttpRequest();
+	postData  = new FormData();
+
+	for( name in data ) {
+		postData.append(name, data[name]);
+	}
+
+	xhr.open('POST', url, true);
+	xhr.responseType = 'json';
+	xhr.onload = function() {
+		var status = xhr.status;
+		if (status === 200) {
+			callback(null, xhr.response);
+		} else {
+			callback(status, xhr.response);
+		}
+	};
+
+	xhr.send(postData);
+};
+
+// loading by callsign from ETs API
+function loadApplicantByCallsign (callsign, divID) {
+	var jsonURL = etApplicantLookupURLPrefix + callsign;
+	getJSON(jsonURL,
+			function(err, data) {
+				if (err !== null) {
+					document.getElementById(divID).innerHTML = 'Something went wrong: ' + err;
+				} else {
+					compareApplicantByCallsign(callsign, divID, data);
+				}
+			});
+}
+
+// loading by FRN by scraping html from CORES
+function loadApplicantByFRN(frn, divID) {
+	var jsonURL = coresApplicantLookupURL;
+	var postData = {simpleSearchName: 'Frn', simpleSearchValue: frn};
+	postJSON(jsonURL,
+			postData,
+			function(err, data) {
+				if (err !== null) {
+					document.getElementById(divID).innerHTML = 'Something went wrong: ' + err;
+				} else {
+					console.log(data);
+					// compareApplicantByCallsign(callsign, divID, data);
+				}
+			});
+}
+
+function compareDataHTML(attributeName,applicationValue,fccValue) {
+	var status = "";
+
+	if (applicationValue === fccValue) {
+		status = "match";
+	} else if ((applicationValue.toUpperCase() === fccValue.toUpperCase()) ||
+			   (applicationValue.replace(/-/,"") === fccValue.replace(/-/,""))) {
+		status = "similar";
+	} else {
+		status = "different";
+	}
+
+	var htmlOutput = "";
+
+	htmlOutput += "<tr class='" + status + "Row'>";
+	htmlOutput += "<td>" + attributeName + "</td>";
+	htmlOutput += "<td>" + applicationValue + "</td>";
+	htmlOutput += "<td>" + fccValue + "</td>";
+	htmlOutput += "</tr>";
+
+	return htmlOutput;
+}
+
+function compareApplicantByCallsign(callsign, divID, applicantUlsData) {
+	var htmlOutput = "";
+	var applicationData = null;
+
+	for (var i = 0; i < window.sessionData.applicants.length; i++){
+		// look for the entry with a matching callsign
+		if (window.sessionData.applicants[i].callsign == callsign){
+			applicationData = window.sessionData.applicants[i];
+			break;
+		}
+	}
+
+	htmlOutput += "<table>";
+
+	htmlOutput += "<tr>";
+	htmlOutput += "<th></th>";
+	htmlOutput += "<th>Application</th>";
+	htmlOutput += "<th>ULS</th>";
+	htmlOutput += "</tr>";
+
+	htmlOutput += compareDataHTML('First Name',applicationData.firstname,applicantUlsData.first_name);
+	htmlOutput += compareDataHTML('Middle Initial',applicationData.middle,applicantUlsData.middle_initial);
+	htmlOutput += compareDataHTML('Last Name',applicationData.lastname,applicantUlsData.last_name);
+	htmlOutput += compareDataHTML('Suffix',applicationData.suffix,applicantUlsData.suffix);
+
+	htmlOutput += compareDataHTML('Address',applicationData.addr,applicantUlsData.address);
+	htmlOutput += compareDataHTML('City',applicationData.city,applicantUlsData.city);
+	htmlOutput += compareDataHTML('State',applicationData.state,applicantUlsData.state);
+	htmlOutput += compareDataHTML('Zip',applicationData.zip,applicantUlsData.zip);
+
+	htmlOutput += "</table>"
+	// htmlOutput += JSON.stringify(applicationData);
+	// htmlOutput += "<br>";
+	// htmlOutput += JSON.stringify(applicantUlsData);
+
+	document.getElementById(divID).innerHTML = htmlOutput;
+}
+
+function coresFrnSearchPopup(frn) {
+	var myWindow = window.open("", coresPopupTarget, "status=0,title=0,height=100,width=200,scrollbars=1");
+
+	if (myWindow) {
+		document.getElementById(coresFormPrefix + frn).submit();
+	} else {
+		alert('You must allow popups for this to work.');
+	}
+}
+
+function coresFrnSearchHTML(frn) {
+	var htmlOutput = "";
+
+	htmlOutput += "<form id='" + coresFormPrefix + frn + 
+					"' target='" + coresPopupTarget + 
+					"' action='" + coresApplicantLookupURL + 
+					"' method='POST' >";
+	htmlOutput += "<input type=hidden name=simpleSearchName value=Frn>";
+	htmlOutput += "<input type=hidden name=simpleSearchValue value=" + frn + ">";
+	htmlOutput += "<button onclick='coresFrnSearchHTML(" + frn + ")'>Compare to CORES</button>";
+	htmlOutput += "</form>";
+
+	return htmlOutput;
+}
+
+function outputApplicants() {
+	var htmlOutput = "";
+
+	htmlOutput += "<center>";
+	htmlOutput += "<hr>";
+
+	window.sessionData.applicants.forEach(function (item, index) {
+		htmlOutput += "PIN: " + item.pin;
+		htmlOutput += " FRN: " + item.frn;
+		htmlOutput += (item.callsign ? " Callsign: " + item.callsign : "");
+		htmlOutput += "<br>";
+		var divID = applicantCheckIDPrefix + item.pin;
+		htmlOutput += "<div id=\"" + divID +"\"> </div>";
+
+		if (item.callsign !== null) {
+			loadApplicantByCallsign(item.callsign, divID);
+		} else {
+			htmlOutput += "Name: " + item.lastname + ", " + item.firstname + " " + item.middle + "<br>";
+			htmlOutput += coresFrnSearchHTML(item.frn);
+			// loadApplicantByFRN(item.frn,divID);
+		}
+		htmlOutput += "<hr>";
+	});
+
+	htmlOutput += "</center>";
+
+	document.getElementById(outputID).innerHTML = htmlOutput;
+}
+
+//loadDataFileName
+function loadData() {
+	var fileSelector = document.getElementById(loadDataFileNameID);
+	
+	fileSelector.value = "";
+	fileSelector.click();
+}
+
+function dataFileNameUpdated() {
+	var fileSelector = document.getElementById(loadDataFileNameID);
+
+  if (fileSelector.value.length != 0) {
+    var file = fileSelector.files[0];
+    var reader = new FileReader();
+    
+    reader.readAsBinaryString(file);
+    reader.onloadend = function() {
+		window.sessionData = JSON.parse(reader.result);
+		outputApplicants();
+		// inputChange();
+	}
+  }	
+}
+
+function onLoad() {
+//	checkDisplayWarning(); 
+	return true;
+}
+
+</script>
+
+<style type="text/css">
+td {
+    padding:2 15px;
+    white-space: nowrap;
+}
+#statsOutput {
+    width: 100%;
+    overflow-x: auto;
+    white-space: nowrap;
+}
+
+#warning-wrapper {
+	display: none;
+	position: absolute;
+	top: 0;
+	left: 0;
+	width: 100%;
+	z-index: 10;
+	background-color: rgba(0,0,0,0.5);
+	padding: 25px;
+}
+#warning {
+	width: 50%;
+	height: auto;
+	margin: 0 auto;
+	padding: 10px;
+	position: relative;
+	text-align: center;
+	background-color: rgb(255,255,0);
+	border-radius: 25px;
+}
+
+.matchRow {
+	background-color: #b2f7b2;
+}
+
+.similarRow {
+	background-color: #e2f7b2;
+}
+
+.differentRow {
+	background-color: #f7c6b2;
+}
+
+.column {
+  float: left;
+  width: 33.33%;
+}
+
+/* Clear floats after the columns */
+.row:after {
+  content: "";
+  display: table;
+  clear: both;
+}
+
+</style>
+
+</head>
+
+<body onload='onLoad();'>
+	<div id=warning-wrapper>
+		<div id=warning>
+			This is the TEST site, probably with inconsistent results.<br>
+			<button type=button onclick='document.getElementById("warning-wrapper").style.display="none"; return true;'>Clear</button>
+		</div>
+	</div>
+
+	<div class="headerBox">
+	<center><h1>GLAARG Session Applicant Info Check</h1></center>
+	</div>
+
+	<form onsubmit="return false;">
+
+	<div>
+		<center>
+			<input type=file id="loadDataFileName" style="display:none;" onchange="dataFileNameUpdated();">
+			<button onclick="loadData()">Load Session Applicant List JSON</button>
+		</center>
+	</div>
+
+	</form>
+
+	<div id="outputDiv">
+
+	</div>
+
+
+</body>
+</html>
