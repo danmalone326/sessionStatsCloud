@@ -14,6 +14,15 @@
 var etApplicantLookupURLPrefix = "https://exam.tools/api/uls/lookup/";
 var coresApplicantLookupURL = "https://apps.fcc.gov/coresWeb/simpleSearch.do?btnSearch=true";
 
+// ULS API does not allow CORS
+// var licenseSearchURLPrefix = "https://data.fcc.gov/api/license-view/basicSearch/getLicenses?sortColumn=expiredDate&format=json&searchValue=";
+
+// Plan B
+var myRegex = /(glaarg(?:-test)?)/;
+var match = myRegex.exec(window.location.pathname);
+var licenseSearchURLPrefix = "https://www.malone.org/cgi-bin/" + match[1] + "/ulsLookup.py?";
+
+
 var coresFormPrefix = "coresLookup";
 var coresPopupTarget = "CORES Popup";
 
@@ -22,6 +31,9 @@ var outputID = "outputDiv";
 var applicantCheckIDPrefix = "applicantCheck"; // append PIN to this
 
 window.sessionData = [];
+var etDataKey = "etData";
+var ulsDataKey = "ulsData";
+var pendingKey = "pending";
 
 function checkDisplayWarning() {
 // 	console.log(document.location.href.includes('glaarg-test'));
@@ -31,72 +43,55 @@ function checkDisplayWarning() {
 }
 
 // Routines for loading JSON results
-function getJSON(url, callback) {
+function getJSON(url, index, name, callback) {
 	var xhr = new XMLHttpRequest();
 	xhr.open('GET', url, true);
 	xhr.responseType = 'json';
 	xhr.onload = function() {
 		var status = xhr.status;
 		if (status === 200) {
-			callback(null, xhr.response);
+			callback(null, xhr.response, index, name);
 		} else {
-			callback(status, xhr.response);
+			callback(status, xhr.response, index, name);
 		}
 	};
 	xhr.send();
+	window.sessionData.applicants[index].data[pendingKey]++;
 };
 
-// Routines for loading JSON results via a POST
-// data is a dictionary of form parameters
-function postJSON(url, data, callback) {
-	var xhr = new XMLHttpRequest();
-	postData  = new FormData();
+function jsonCallback(err, data, index, name) {
+	var result = {};
+	if (err !== null) {
+		console.log('Something went wrong: ' + err + ", index: " + index + ", name: " + name);
+	} else {
+		result = data;
+	}
+	window.sessionData.applicants[index].data[name] = result;
+	if (--window.sessionData.applicants[index].data[pendingKey] == 0) {
+		outputApplicantData(index);
+	}
+};
 
-	for( name in data ) {
-		postData.append(name, data[name]);
+function loadApplicantData(index) {
+	var jsonURL;
+	var name;
+	var applicationData = window.sessionData.applicants[index];
+	window.sessionData.applicants[index].data = {};
+	window.sessionData.applicants[index].data[pendingKey] = 0;
+
+	if ((applicationData.callsign) || (applicationData.frn)) {
+		jsonURL = licenseSearchURLPrefix + "frn=" + applicationData.frn;
+		if (applicationData.callsign) {
+			jsonURL += "&callsign=" + applicationData.callsign;
+		}
+		
+		getJSON(jsonURL, index, ulsDataKey, jsonCallback);
 	}
 
-	xhr.open('POST', url, true);
-	xhr.responseType = 'json';
-	xhr.onload = function() {
-		var status = xhr.status;
-		if (status === 200) {
-			callback(null, xhr.response);
-		} else {
-			callback(status, xhr.response);
-		}
-	};
-
-	xhr.send(postData);
-};
-
-// loading by callsign from ETs API
-function loadApplicantByCallsign (callsign, divID) {
-	var jsonURL = etApplicantLookupURLPrefix + callsign;
-	getJSON(jsonURL,
-			function(err, data) {
-				if (err !== null) {
-					document.getElementById(divID).innerHTML = 'Something went wrong: ' + err;
-				} else {
-					compareApplicantByCallsign(callsign, divID, data);
-				}
-			});
-}
-
-// loading by FRN by scraping html from CORES
-function loadApplicantByFRN(frn, divID) {
-	var jsonURL = coresApplicantLookupURL;
-	var postData = {simpleSearchName: 'Frn', simpleSearchValue: frn};
-	postJSON(jsonURL,
-			postData,
-			function(err, data) {
-				if (err !== null) {
-					document.getElementById(divID).innerHTML = 'Something went wrong: ' + err;
-				} else {
-					console.log(data);
-					// compareApplicantByCallsign(callsign, divID, data);
-				}
-			});
+	if (applicationData.callsign) {
+		jsonURL = etApplicantLookupURLPrefix + applicationData.callsign;
+		getJSON(jsonURL, index, etDataKey, jsonCallback);
+	}
 }
 
 function compareDataHTML(attributeName,applicationValue,fccValue) {
@@ -188,6 +183,18 @@ function coresFrnSearchHTML(frn) {
 	return htmlOutput;
 }
 
+function outputApplicantData(index) {
+	var htmlOutput = "";
+	var applicant = window.sessionData.applicants[index];
+
+	htmlOutput += "Name: " + applicant.lastname + ", " + applicant.firstname + " " + applicant.middle + "<br>";
+	htmlOutput += coresFrnSearchHTML(applicant.frn);
+	htmlOutput += "<br>";
+
+	var divID = applicantCheckIDPrefix + index;
+	document.getElementById(divID).innerHTML += htmlOutput;
+}
+
 function outputApplicants() {
 	var frnList = [];
 	var frnDupe = false;
@@ -210,17 +217,12 @@ function outputApplicants() {
 			htmlOutput += " <span style=\"color:red\">DUPE</span> ";
 		}
 		htmlOutput += "<br>";
-		var divID = applicantCheckIDPrefix + item.pin;
+		var divID = applicantCheckIDPrefix + index;
 		htmlOutput += "<div id=\"" + divID +"\"> </div>";
 
-		if (item.callsign) {
-			loadApplicantByCallsign(item.callsign, divID);
-		} else {
-			htmlOutput += "Name: " + item.lastname + ", " + item.firstname + " " + item.middle + "<br>";
-			htmlOutput += coresFrnSearchHTML(item.frn);
-			// loadApplicantByFRN(item.frn,divID);
-		}
 		htmlOutput += "<hr>";
+
+		loadApplicantData(index);
 	});
 
 	htmlOutput += "</center>";
