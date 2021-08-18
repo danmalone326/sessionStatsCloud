@@ -62,11 +62,11 @@ function getJSON(url, index, name, callback) {
 function jsonCallback(err, data, index, name) {
 	var result = {};
 	if (err !== null) {
-		console.log('Something went wrong: ' + err + ", index: " + index + ", name: " + name);
+		console.log('Something is odd: ' + err + ", index: " + index + ", name: " + name);
 	} else {
 		result = data;
+		window.sessionData.applicants[index].data[name] = result;
 	}
-	window.sessionData.applicants[index].data[name] = result;
 	if (--window.sessionData.applicants[index].data[pendingKey] == 0) {
 		outputApplicantData(index);
 	}
@@ -94,7 +94,19 @@ function loadApplicantData(index) {
 	}
 }
 
-function compareDataHTML(attributeName,applicationValue,fccValue) {
+function ulsDataSort(a,b) {
+	var result = 0;
+	var sortA = a.expiredDate.substring(6,10) + a.expiredDate.substring(0,2) + a.expiredDate.substring(3,5) + a.statusDesc;
+	var sortB = b.expiredDate.substring(6,10) + b.expiredDate.substring(0,2) + b.expiredDate.substring(3,5) + b.statusDesc;
+	if (expA < expB) {
+		result = -1;
+	} else if (expA > expB) {
+		result = 1;
+	} 
+	return result;
+}
+
+function compareETDataHTML(attributeName,applicationValue,fccValue) {
 	var status = "";
 
 	if (applicationValue === fccValue) {
@@ -120,42 +132,89 @@ function compareDataHTML(attributeName,applicationValue,fccValue) {
 	return htmlOutput;
 }
 
-function compareApplicantByCallsign(callsign, divID, applicantUlsData) {
+function whatETSeesHTML(index) {
 	var htmlOutput = "";
-	var applicationData = null;
+	var applicationData = window.sessionData.applicants[index];
 
-	for (var i = 0; i < window.sessionData.applicants.length; i++){
-		// look for the entry with a matching callsign
-		if (window.sessionData.applicants[i].callsign == callsign){
-			applicationData = window.sessionData.applicants[i];
-			break;
-		}
+	if (etDataKey in applicationData.data) {
+
+		var applicantUlsData = applicationData.data[etDataKey];
+
+		htmlOutput += "<h3>What ExamTools sees</h3>";
+		htmlOutput += "<table>";
+
+		htmlOutput += "<tr>";
+		htmlOutput += "<th></th>";
+		htmlOutput += "<th>Application</th>";
+		htmlOutput += "<th>ULS (via ET API)</th>";
+		htmlOutput += "</tr>";
+
+		htmlOutput += compareETDataHTML('First Name',applicationData.firstname,applicantUlsData.first_name);
+		htmlOutput += compareETDataHTML('Middle Initial',applicationData.middle,applicantUlsData.middle_initial);
+		htmlOutput += compareETDataHTML('Last Name',applicationData.lastname,applicantUlsData.last_name);
+		htmlOutput += compareETDataHTML('Suffix',applicationData.suffix,applicantUlsData.suffix);
+
+		htmlOutput += compareETDataHTML('Address',applicationData.addr,applicantUlsData.address);
+		htmlOutput += compareETDataHTML('City',applicationData.city,applicantUlsData.city);
+		htmlOutput += compareETDataHTML('State',applicationData.state,applicantUlsData.state);
+		htmlOutput += compareETDataHTML('Zip',applicationData.zip,applicantUlsData.zip);
+
+		htmlOutput += "</table>"
+		// htmlOutput += JSON.stringify(applicationData);
+		// htmlOutput += "<br>";
+		// htmlOutput += JSON.stringify(applicantUlsData);
 	}
 
-	htmlOutput += "<table>";
+	return htmlOutput;
+}
 
-	htmlOutput += "<tr>";
-	htmlOutput += "<th></th>";
-	htmlOutput += "<th>Application</th>";
-	htmlOutput += "<th>ULS (via ET API)</th>";
-	htmlOutput += "</tr>";
+function ulsDataSort(a,b) {
+	var result = 0;
+	var sortA = a.expiredDate.substring(6,10) + a.expiredDate.substring(0,2) + a.expiredDate.substring(3,5) + a.statusDesc;
+	var sortB = b.expiredDate.substring(6,10) + b.expiredDate.substring(0,2) + b.expiredDate.substring(3,5) + b.statusDesc;
+	if (expA < expB) {
+		result = -1;
+	} else if (expA > expB) {
+		result = 1;
+	} 
+	return result;
+}
 
-	htmlOutput += compareDataHTML('First Name',applicationData.firstname,applicantUlsData.first_name);
-	htmlOutput += compareDataHTML('Middle Initial',applicationData.middle,applicantUlsData.middle_initial);
-	htmlOutput += compareDataHTML('Last Name',applicationData.lastname,applicantUlsData.last_name);
-	htmlOutput += compareDataHTML('Suffix',applicationData.suffix,applicantUlsData.suffix);
+function ulsCheckHTML(index) {
+	var htmlOutput = "";
+	var applicationData = window.sessionData.applicants[index];
 
-	htmlOutput += compareDataHTML('Address',applicationData.addr,applicantUlsData.address);
-	htmlOutput += compareDataHTML('City',applicationData.city,applicantUlsData.city);
-	htmlOutput += compareDataHTML('State',applicationData.state,applicantUlsData.state);
-	htmlOutput += compareDataHTML('Zip',applicationData.zip,applicantUlsData.zip);
+	if (ulsDataKey in applicationData.data) {
 
-	htmlOutput += "</table>"
-	// htmlOutput += JSON.stringify(applicationData);
-	// htmlOutput += "<br>";
-	// htmlOutput += JSON.stringify(applicantUlsData);
+		var applicantUlsData = applicationData.data[ulsDataKey];
 
-	document.getElementById(divID).innerHTML = htmlOutput;
+		htmlOutput += "<h3>ULS Checks</h3>";
+
+		htmlOutput += "<table>";
+
+		htmlOutput += "<tr>";
+		htmlOutput += "<th></th>";
+		htmlOutput += "<th></th>";
+		htmlOutput += "<th></th>";
+		htmlOutput += "</tr>";
+
+		htmlOutput += compareDataHTML('First Name',applicationData.firstname,applicantUlsData.first_name);
+		htmlOutput += compareDataHTML('Middle Initial',applicationData.middle,applicantUlsData.middle_initial);
+		htmlOutput += compareDataHTML('Last Name',applicationData.lastname,applicantUlsData.last_name);
+		htmlOutput += compareDataHTML('Suffix',applicationData.suffix,applicantUlsData.suffix);
+
+		htmlOutput += compareDataHTML('Address',applicationData.addr,applicantUlsData.address);
+		htmlOutput += compareDataHTML('City',applicationData.city,applicantUlsData.city);
+		htmlOutput += compareDataHTML('State',applicationData.state,applicantUlsData.state);
+		htmlOutput += compareDataHTML('Zip',applicationData.zip,applicantUlsData.zip);
+
+		htmlOutput += "</table>"
+		// htmlOutput += JSON.stringify(applicationData);
+		// htmlOutput += "<br>";
+		// htmlOutput += JSON.stringify(applicantUlsData);
+	}
+
+	return htmlOutput;
 }
 
 function coresFrnSearchPopup(frn) {
@@ -183,16 +242,32 @@ function coresFrnSearchHTML(frn) {
 	return htmlOutput;
 }
 
+function coresCheckHTML(index) {
+	var htmlOutput = "";
+	var applicationData = window.sessionData.applicants[index];
+
+	htmlOutput += "<h3>CORES Checks</h3>";
+	htmlOutput += "<table class='coresTable'><tr>";
+	htmlOutput += "<td>" + applicationData.lastname + ", " + applicationData.firstname + " " + applicationData.middle + "</td>";
+	htmlOutput += "<td>";
+	htmlOutput += coresFrnSearchHTML(applicationData.frn);
+	htmlOutput += "</td>";
+	htmlOutput += "</tr></table>";
+
+	return htmlOutput;
+}
+
+
 function outputApplicantData(index) {
 	var htmlOutput = "";
 	var applicant = window.sessionData.applicants[index];
 
-	htmlOutput += "Name: " + applicant.lastname + ", " + applicant.firstname + " " + applicant.middle + "<br>";
-	htmlOutput += coresFrnSearchHTML(applicant.frn);
-	htmlOutput += "<br>";
+	htmlOutput += whatETSeesHTML(index);
 
+	htmlOutput += coresCheckHTML(index);
+	
 	var divID = applicantCheckIDPrefix + index;
-	document.getElementById(divID).innerHTML += htmlOutput;
+	document.getElementById(divID).innerHTML = htmlOutput;
 }
 
 function outputApplicants() {
@@ -218,7 +293,7 @@ function outputApplicants() {
 		}
 		htmlOutput += "<br>";
 		var divID = applicantCheckIDPrefix + index;
-		htmlOutput += "<div id=\"" + divID +"\"> </div>";
+		htmlOutput += "<div id=\"" + divID +"\">Loading...</div>";
 
 		htmlOutput += "<hr>";
 
@@ -303,6 +378,14 @@ td {
 
 .differentRow {
 	background-color: #f7c6b2;
+}
+
+.coresTable {
+	vertical-align: middle;
+}
+
+.coresTable form {
+	margin-block-end: 0em;
 }
 
 .column {
