@@ -25,6 +25,7 @@ var licenseSearchURLPrefix = "https://www.malone.org/cgi-bin/" + match[1] + "/ul
 
 var coresFormPrefix = "coresLookup";
 var coresPopupTarget = "CORES Popup";
+var iFrameID = "ulsiFrame";
 
 var loadDataFileNameID = "loadDataFileName";
 var outputID = "outputDiv";
@@ -34,6 +35,10 @@ window.sessionData = [];
 var etDataKey = "etData";
 var ulsDataKey = "ulsData";
 var pendingKey = "pending";
+
+var matchValueClass = "matchValue";
+var similarValueClass = "similarValue";
+var differentValueClass = "differentValue";
 
 function checkDisplayWarning() {
 // 	console.log(document.location.href.includes('glaarg-test'));
@@ -107,24 +112,24 @@ function ulsDataSort(a,b) {
 }
 
 function compareETDataHTML(attributeName,applicationValue,fccValue) {
-	var status = "";
+	var rowClass = "";
 
 	if (applicationValue === fccValue) {
-		status = "match";
+		rowClass = matchValueClass;
 	} else if ((applicationValue.toUpperCase() === fccValue.toUpperCase()) ||
 			   ((attributeName == "Zip") && 
 			    ((applicationValue.replace(/-/,"") === fccValue.replace(/-/,"")) || 
 				 (applicationValue.substring(0,3) === fccValue.substring(0,3))))
 			   ) {
-		status = "similar";
+		rowClass = similarValueClass;
 	} else {
-		status = "different";
+		rowClass = differentValueClass;
 	}
 
 	var htmlOutput = "";
 
-	htmlOutput += "<tr class='" + status + "Row'>";
-	htmlOutput += "<td>" + attributeName + "</td>";
+	htmlOutput += "<tr class='" + rowClass + "'>";
+	// htmlOutput += "<td>" + attributeName + "</td>";
 	htmlOutput += "<td>" + applicationValue + "</td>";
 	htmlOutput += "<td>" + fccValue + "</td>";
 	htmlOutput += "</tr>";
@@ -144,9 +149,9 @@ function whatETSeesHTML(index) {
 		htmlOutput += "<table>";
 
 		htmlOutput += "<tr>";
-		htmlOutput += "<th></th>";
+		// htmlOutput += "<th></th>";
 		htmlOutput += "<th>Application</th>";
-		htmlOutput += "<th>ULS (via ET API)</th>";
+		htmlOutput += "<th>ETs copy of ULS</th>";
 		htmlOutput += "</tr>";
 
 		htmlOutput += compareETDataHTML('First Name',applicationData.firstname,applicantUlsData.first_name);
@@ -168,19 +173,28 @@ function whatETSeesHTML(index) {
 	return htmlOutput;
 }
 
+// sort by expiredDate desc, statusDesc
 function ulsDataSort(a,b) {
 	var result = 0;
-	var sortA = a.expiredDate.substring(6,10) + a.expiredDate.substring(0,2) + a.expiredDate.substring(3,5) + a.statusDesc;
-	var sortB = b.expiredDate.substring(6,10) + b.expiredDate.substring(0,2) + b.expiredDate.substring(3,5) + b.statusDesc;
-	if (expA < expB) {
+	var sortA = a.expiredDate.substring(6,10) + a.expiredDate.substring(0,2) + a.expiredDate.substring(3,5);
+	var sortB = b.expiredDate.substring(6,10) + b.expiredDate.substring(0,2) + b.expiredDate.substring(3,5);
+	if (expA > expB) {
 		result = -1;
-	} else if (expA > expB) {
+	} else if (expA < expB) {
 		result = 1;
-	} 
+	} else {
+		if (a.statusDesc < b.statusDesc) {
+			result = -1;
+		} else if (a.statusDesc > b.statusDesc) {
+			result = 1;
+		}
+	}
+
 	return result;
 }
 
 function ulsCheckHTML(index) {
+	var dataClass = "";
 	var htmlOutput = "";
 	var applicationData = window.sessionData.applicants[index];
 
@@ -188,55 +202,92 @@ function ulsCheckHTML(index) {
 
 		var applicantUlsData = applicationData.data[ulsDataKey];
 
-		htmlOutput += "<h3>ULS Checks</h3>";
+		htmlOutput += "<h3>ULS Entries</h3>";
 
-		htmlOutput += "<table>";
+		if (applicantUlsData.length == 0) {
+			htmlOutput += "No Amateur Licenses found in ULS for this FRN or Callsign.";
+		} else {
 
-		htmlOutput += "<tr>";
-		htmlOutput += "<th></th>";
-		htmlOutput += "<th></th>";
-		htmlOutput += "<th></th>";
-		htmlOutput += "</tr>";
+			htmlOutput += "<table><tr><td>";
+				htmlOutput += applicationData.lastname 
+							+ (applicationData.suffix ? " " + applicationData.suffix : "")
+							+ ", " + applicationData.firstname 
+							+ " " + applicationData.middle + "<br>";
+				htmlOutput += applicationData.addr + "<br>";
+				htmlOutput += applicationData.city + ", " + applicationData.state + " " + applicationData.zip + "<br>";
+			htmlOutput += "</td></tr></table>";
 
-		htmlOutput += compareDataHTML('First Name',applicationData.firstname,applicantUlsData.first_name);
-		htmlOutput += compareDataHTML('Middle Initial',applicationData.middle,applicantUlsData.middle_initial);
-		htmlOutput += compareDataHTML('Last Name',applicationData.lastname,applicantUlsData.last_name);
-		htmlOutput += compareDataHTML('Suffix',applicationData.suffix,applicantUlsData.suffix);
+			htmlOutput += "<table class='coresTable'>";
 
-		htmlOutput += compareDataHTML('Address',applicationData.addr,applicantUlsData.address);
-		htmlOutput += compareDataHTML('City',applicationData.city,applicantUlsData.city);
-		htmlOutput += compareDataHTML('State',applicationData.state,applicantUlsData.state);
-		htmlOutput += compareDataHTML('Zip',applicationData.zip,applicantUlsData.zip);
+			htmlOutput += "<tr>";
+			htmlOutput += "<th>FRN</th>";
+			htmlOutput += "<th>Call Sign</th>";
+			htmlOutput += "<th>Status</th>";
+			htmlOutput += "<th></th>";
+			htmlOutput += "</tr>";
 
-		htmlOutput += "</table>"
-		// htmlOutput += JSON.stringify(applicationData);
-		// htmlOutput += "<br>";
-		// htmlOutput += JSON.stringify(applicantUlsData);
+			applicationData.data[ulsDataKey].forEach(function (item, index) {
+				item.licDetailURL = item.licDetailURL.replace("http://","https://");
+				htmlOutput += "<tr>";
+
+				dataClass = matchValueClass;
+				if (item.frn !== applicationData.frn){
+					dataClass = differentValueClass;
+				}
+				htmlOutput += "<td class='" + dataClass + "'>" + item.frn + "</td>";
+
+				dataClass = matchValueClass;
+				if (item.callsign !== applicationData.callsign) {
+					dataClass = differentValueClass;
+				}
+				htmlOutput += "<td class='" + dataClass + "'>" + item.callsign + "</td>";
+
+				htmlOutput += "<td>" + item.statusDesc + "</td>";
+
+				var formID = coresFormPrefix + "-" + applicationData.pin + "-" + item.licenseID;
+				htmlOutput += "<td>";
+				htmlOutput += "<form id='" + formID + 
+								"' target='" + coresPopupTarget + 
+								"' action='" + item.licDetailURL + 
+								"' method='POST' >";
+				htmlOutput += "<button onclick='coresPopup(\"" + formID + "\")'>Open ULS Entry</button>";
+				htmlOutput += "</td>";
+				htmlOutput += "</form>";
+				htmlOutput += "</tr>";
+			});
+
+			htmlOutput += "</table>"
+			// htmlOutput += JSON.stringify(applicationData);
+			// htmlOutput += "<br>";
+			// htmlOutput += JSON.stringify(applicantUlsData);
+		}
 	}
 
 	return htmlOutput;
 }
 
-function coresFrnSearchPopup(frn) {
-	var myWindow = window.open("", coresPopupTarget, "status=0,title=0,height=100,width=200,scrollbars=1");
+function coresPopup(formID) {
+	var myWindow = window.open("", coresPopupTarget, "status=0,title=0,height=800,width=600,scrollbars=1");
 
 	if (myWindow) {
-		document.getElementById(coresFormPrefix + frn).submit();
+		document.getElementById(formID).submit();
 	} else {
 		alert('You must allow popups for this to work.');
 	}
+	return true;
 }
 
 function coresFrnSearchHTML(frn) {
 	var htmlOutput = "";
+	var formID = coresFormPrefix + frn;
 
-	htmlOutput += "<form id='" + coresFormPrefix + frn + 
+	htmlOutput += "<form id='" + formID + 
 					"' target='" + coresPopupTarget + 
 					"' action='" + coresApplicantLookupURL + 
 					"' method='POST' >";
 	htmlOutput += "<input type=hidden name=simpleSearchName value=Frn>";
 	htmlOutput += "<input type=hidden name=simpleSearchValue value=" + frn + ">";
-	htmlOutput += "<button onclick='coresFrnSearchHTML(" + frn + ")'>Compare to CORES</button>";
+	htmlOutput += "<button onclick='coresPopup(\"" + formID + "\")'>Open CORES Entry</button>";
 	htmlOutput += "</form>";
 
 	return htmlOutput;
@@ -246,9 +297,13 @@ function coresCheckHTML(index) {
 	var htmlOutput = "";
 	var applicationData = window.sessionData.applicants[index];
 
-	htmlOutput += "<h3>CORES Checks</h3>";
+	htmlOutput += "<h3>CORES Entry</h3>";
 	htmlOutput += "<table class='coresTable'><tr>";
-	htmlOutput += "<td>" + applicationData.lastname + ", " + applicationData.firstname + " " + applicationData.middle + "</td>";
+	htmlOutput += "<td>" + applicationData.lastname 
+						+ ", " + applicationData.firstname 
+						+ " " + applicationData.middle
+						+ (applicationData.suffix ? " " + applicationData.suffix : "")
+						+ "</td>";
 	htmlOutput += "<td>";
 	htmlOutput += coresFrnSearchHTML(applicationData.frn);
 	htmlOutput += "</td>";
@@ -263,7 +318,7 @@ function outputApplicantData(index) {
 	var applicant = window.sessionData.applicants[index];
 
 	htmlOutput += whatETSeesHTML(index);
-
+	htmlOutput += ulsCheckHTML(index);
 	htmlOutput += coresCheckHTML(index);
 	
 	var divID = applicantCheckIDPrefix + index;
@@ -285,13 +340,16 @@ function outputApplicants() {
 			frnDupe = false;
 			frnList.push(item.frn);
 		}
+
+		htmlOutput += "<h2>";
 		htmlOutput += "PIN: " + item.pin;
 		htmlOutput += " FRN: " + item.frn;
 		htmlOutput += (item.callsign ? " Callsign: " + item.callsign : "");
 		if (frnDupe) {
 			htmlOutput += " <span style=\"color:red\">DUPE</span> ";
 		}
-		htmlOutput += "<br>";
+		htmlOutput += "</h2>";
+		
 		var divID = applicantCheckIDPrefix + index;
 		htmlOutput += "<div id=\"" + divID +"\">Loading...</div>";
 
@@ -368,15 +426,15 @@ td {
 	border-radius: 25px;
 }
 
-.matchRow {
-	background-color: #b2f7b2;
+.matchValue {
+	background-color: #eff9ef;
 }
 
-.similarRow {
-	background-color: #e2f7b2;
+.similarValue {
+	background-color: #f6f7b2;
 }
 
-.differentRow {
+.differentValue {
 	background-color: #f7c6b2;
 }
 
@@ -413,24 +471,18 @@ td {
 	</div>
 
 	<div class="headerBox">
-	<center><h1>GLAARG Session Applicant Info Check</h1></center>
-	</div>
-
-	<form onsubmit="return false;">
-
-	<div>
 		<center>
-			<input type=file id="loadDataFileName" style="display:none;" onchange="dataFileNameUpdated();">
-			<button onclick="loadData()">Load Session Applicant JSON</button>
+			<h1>GLAARG Session Applicant Info Check</h1>
+			<form onsubmit="return false;">
+				<input type=file id="loadDataFileName" style="display:none;" onchange="dataFileNameUpdated();">
+				<button onclick="loadData()">Load Session Applicant JSON</button>
+			</form>
 		</center>
 	</div>
-
-	</form>
 
 	<div id="outputDiv">
 
 	</div>
-
 
 </body>
 </html>
