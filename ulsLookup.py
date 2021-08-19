@@ -22,7 +22,7 @@ def licenseExists(data,licenseID):
 
 def addUniqueEntries(data,newData):
     for license in newData["Licenses"]["License"]:
-        if (not licenseExists(data,license["licenseID"])):
+        if (((license["serviceDesc"] == "Amateur") or (license["serviceDesc"] == "Vanity")) and (not licenseExists(data,license["licenseID"]))):
             data.append(license)
 
 def addLicenses(data,searchValue):
