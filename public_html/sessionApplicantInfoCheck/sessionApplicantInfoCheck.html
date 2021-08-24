@@ -458,6 +458,17 @@ td {
   clear: both;
 }
 
+.warning {
+  background-color: rgba(252, 248, 227, 1);
+  border-color: rgba(177, 161, 129, 1);
+  color: rgba(138, 109, 59, 1);
+  padding: 12px 16px;
+  border-radius: 4px;
+  border-style: solid;
+  border-width: 1px;
+  margin-bottom: 12px;
+}
+
 </style>
 
 </head>
@@ -477,6 +488,10 @@ td {
 				<input type=file id="loadDataFileName" style="display:none;" onchange="dataFileNameUpdated();">
 				<button onclick="loadData()">Load Session Applicant JSON</button>
 			</form>
+
+			<div class="warning">This file will not leave your machine.<br>
+				FRN and callsign will be used to query FCC and ET databases.</div>
+			
 		</center>
 	</div>
 
