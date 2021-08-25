@@ -387,24 +387,8 @@ function dataFileNameUpdated() {
   }	
 }
 
-function handleByLine() {
-	var byLineDiv = document.querySelector('#byLine');
-
-	byLineDiv.addEventListener('onmouseover',(event) => {
-		document.getElementById('support').style.display='block';
-		console.log('clicked');
-	});
-	byLineDiv.addEventListener('onmouseleave',(event) => {
-		document.getElementById('support').style.display='none';
-		console.log('clicked');
-	});
-	console.log('setup');
-	// onmouseenter="d" ="document.getElementById('support').display='none';"
-}
-
 function onLoad() {
 //	checkDisplayWarning(); 
-	handleByLine();
 	return true;
 }
 
