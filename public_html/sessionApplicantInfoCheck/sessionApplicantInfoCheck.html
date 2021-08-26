@@ -145,8 +145,11 @@ function loadApplicantData(index) {
 function compareETDataHTML(attributeName,applicationValue,fccValue) {
 	var rowClass = "";
 
-	if (applicationValue === fccValue) {
+	if ((applicationValue === fccValue) || 
+		 (!applicationValue && !fccValue)) {
 		rowClass = matchValueClass;
+	} else if (!applicationValue || !fccValue) {
+		rowClass = differentValueClass;
 	} else if ((applicationValue.toUpperCase() === fccValue.toUpperCase()) ||
 			   ((attributeName == "Zip") && 
 			    ((applicationValue.replace(/-/,"") === fccValue.replace(/-/,"")) || 
@@ -161,8 +164,8 @@ function compareETDataHTML(attributeName,applicationValue,fccValue) {
 
 	htmlOutput += "<tr class='" + rowClass + "'>";
 	// htmlOutput += "<td>" + attributeName + "</td>";
-	htmlOutput += "<td>" + applicationValue + "</td>";
-	htmlOutput += "<td>" + fccValue + "</td>";
+	htmlOutput += "<td>" + (applicationValue ? applicationValue : "&nbsp;") + "</td>";
+	htmlOutput += "<td>" + (fccValue ? fccValue : "&nbsp;") + "</td>";
 	htmlOutput += "</tr>";
 
 	return htmlOutput;
