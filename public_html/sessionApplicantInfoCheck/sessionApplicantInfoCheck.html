@@ -99,18 +99,6 @@ function loadApplicantData(index) {
 	}
 }
 
-function ulsDataSort(a,b) {
-	var result = 0;
-	var sortA = a.expiredDate.substring(6,10) + a.expiredDate.substring(0,2) + a.expiredDate.substring(3,5) + a.statusDesc;
-	var sortB = b.expiredDate.substring(6,10) + b.expiredDate.substring(0,2) + b.expiredDate.substring(3,5) + b.statusDesc;
-	if (expA < expB) {
-		result = -1;
-	} else if (expA > expB) {
-		result = 1;
-	} 
-	return result;
-}
-
 function compareETDataHTML(attributeName,applicationValue,fccValue) {
 	var rowClass = "";
 
