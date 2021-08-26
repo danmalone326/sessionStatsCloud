@@ -43,8 +43,39 @@ var differentValueClass = "differentValue";
 function checkDisplayWarning() {
 // 	console.log(document.location.href.includes('glaarg-test'));
 	if (document.location.href.includes('glaarg-test')) {
-		document.getElementById('warning-wrapper').style.display='block';
+		document.getElementById('testWarningWrapper').style.display='block';
 	}
+}
+
+var progressDivID = "progress";
+var jsonRequestQueue = [];
+
+function updateProgress() {
+	var htmlOutput = "";
+
+	if (jsonRequestQueue.length == 0) {
+		document.getElementById(progressDivID).style.display = 'none';
+		document.getElementById(progressDivID).innerHTML = "You should not see this.";
+	} else {
+		htmlOutput += "<center>";
+			htmlOutput += "Requests remaining: " + jsonRequestQueue.length + "<br>";
+			for (let i = 0; i < jsonRequestQueue.length; i++) {
+				htmlOutput += jsonRequestQueue[i]["url"] + "<br>";
+			}
+		htmlOutput += "</center>";
+
+		document.getElementById(progressDivID).innerHTML = htmlOutput;
+		document.getElementById(progressDivID).style.display = 'block';
+	}
+}
+
+function addJSONRequest(url,index,name) {
+	jsonRequestQueue.push({"url": url, "index": index, "name": name});
+	updateProgress();
+}
+
+function getNextJSONRequest() {
+	return jsonRequestQueue.shift();
 }
 
 // Routines for loading JSON results
@@ -75,7 +106,18 @@ function jsonCallback(err, data, index, name) {
 	if (--window.sessionData.applicants[index].data[pendingKey] == 0) {
 		outputApplicantData(index);
 	}
+
+	updateProgress();
+	doNextJSONRequest();
 };
+
+function doNextJSONRequest() {
+	var request = getNextJSONRequest();
+
+	if (request) {
+		getJSON(request.url, request.index, request.name, jsonCallback);
+	}
+}
 
 function loadApplicantData(index) {
 	var jsonURL;
@@ -89,26 +131,15 @@ function loadApplicantData(index) {
 		if (applicationData.callsign) {
 			jsonURL += "&callsign=" + applicationData.callsign;
 		}
-		
-		getJSON(jsonURL, index, ulsDataKey, jsonCallback);
+	
+		addJSONRequest(jsonURL, index, ulsDataKey);
 	}
 
 	if (applicationData.callsign) {
 		jsonURL = etApplicantLookupURLPrefix + applicationData.callsign;
-		getJSON(jsonURL, index, etDataKey, jsonCallback);
+		addJSONRequest(jsonURL, index, etDataKey);
 	}
-}
-
-function ulsDataSort(a,b) {
-	var result = 0;
-	var sortA = a.expiredDate.substring(6,10) + a.expiredDate.substring(0,2) + a.expiredDate.substring(3,5) + a.statusDesc;
-	var sortB = b.expiredDate.substring(6,10) + b.expiredDate.substring(0,2) + b.expiredDate.substring(3,5) + b.statusDesc;
-	if (expA < expB) {
-		result = -1;
-	} else if (expA > expB) {
-		result = 1;
-	} 
-	return result;
+	doNextJSONRequest();
 }
 
 function compareETDataHTML(attributeName,applicationValue,fccValue) {
@@ -388,7 +419,7 @@ function dataFileNameUpdated() {
 }
 
 function onLoad() {
-//	checkDisplayWarning(); 
+	checkDisplayWarning(); 
 	return true;
 }
 
@@ -405,7 +436,7 @@ td {
     white-space: nowrap;
 }
 
-#warning-wrapper {
+#testWarningWrapper {
 	display: none;
 	position: absolute;
 	top: 0;
@@ -415,7 +446,7 @@ td {
 	background-color: rgba(0,0,0,0.5);
 	padding: 25px;
 }
-#warning {
+#testWarning {
 	width: 50%;
 	height: auto;
 	margin: 0 auto;
@@ -458,15 +489,28 @@ td {
   clear: both;
 }
 
-.warning {
-  background-color: rgba(252, 248, 227, 1);
-  border-color: rgba(177, 161, 129, 1);
-  color: rgba(138, 109, 59, 1);
-  padding: 12px 16px;
-  border-radius: 4px;
-  border-style: solid;
-  border-width: 1px;
-  margin-bottom: 12px;
+.alertBox {
+	background-color: rgba(252, 248, 227, 1);
+	border-color: rgba(177, 161, 129, 1);
+	color: rgba(138, 109, 59, 1);
+	padding: 12px 16px;
+	border-radius: 4px;
+	border-style: solid;
+	border-width: 1px;
+	margin-bottom: 12px;
+}
+
+#warning {
+	background-color: rgba(252, 248, 227, 1);
+	border-color: rgba(177, 161, 129, 1);
+	color: rgba(138, 109, 59, 1);
+}
+
+#progress {
+	background-color: rgba(217, 237, 247, 1);
+	color: rgba(49, 112, 143, 1);
+	border-color: rgba(126, 182, 193, 1);
+	display: none;
 }
 
 .byLine {
@@ -507,10 +551,10 @@ td {
 </head>
 
 <body onload='onLoad();'>
-	<div id=warning-wrapper>
-		<div id=warning>
+	<div id="testWarningWrapper">
+		<div id=testWarning>
 			This is the TEST site, probably with inconsistent results.<br>
-			<button type=button onclick='document.getElementById("warning-wrapper").style.display="none"; return true;'>Clear</button>
+			<button type=button onclick='document.getElementById("testWarningWrapper").style.display="none"; return true;'>Clear</button>
 		</div>
 	</div>
 
@@ -522,9 +566,12 @@ td {
 				<button onclick="loadData()">Load Session Applicant JSON</button>
 			</form>
 
-			<div class="warning">This file will not leave your machine.<br>
+			<div id="warning" class="alertBox">This file will not leave your machine.<br>
 				FRN and callsign will be used to query FCC and ET databases.</div>
 			
+			<div id="progress" class="alertBox">
+test
+			</div>
 		</center>
 	</div>
 
