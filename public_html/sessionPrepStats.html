@@ -34,6 +34,7 @@ window.selectedList = [];
 window.maybeList = [];
 window.roomAssignments = [];
 window.specialRooms = ['Main','Welcome','Precheck','Ready'];
+window.finalRoomAssignments = {};
 
 function checkDisplayWarning() {
 // 	console.log(document.location.href.includes('glaarg-test'));
@@ -69,6 +70,44 @@ function loadJSON () {
 			});
 }
 
+var standardRoomPrefix = "Room ";
+function standardRoomName(i) {
+	return standardRoomPrefix + i;
+}
+
+function isStandardRoomName(name) {
+	return name.startsWith(standardRoomName);
+}
+
+function veDisplay(ve) {
+	var veObject;
+	var result;
+
+	if (typeof ve === 'object' && ve !== null) {
+		veObject = ve;
+	} else {
+		veObject = getVEbyID(ve);
+	}
+
+	if (veObject) {
+		var showSessions = document.getElementById(showSessionsID).checked;
+		result = veObject.veNumber+"-"+veObject.veCallSign+" "+veObject.vePreferredName+(showSessions ? " ("+veObject.overallSessionCount+")" : "");
+	} else {
+		result = ve;
+	}
+
+	return result;
+}
+
+function getVEbyID(veNumber) {
+	return window.stats.filter(ve => { return ve.veNumber === veNumber })[0];
+}
+
+function veID(ve) {
+	return ve.veNumber;
+}
+
+// Used to sort VE list by session count
 function compareBySessionsDec(a,b) {
 	var result = 0;
   	if (a.overallSessionCount > b.overallSessionCount) {
@@ -79,56 +118,139 @@ function compareBySessionsDec(a,b) {
   	return result;
 }
 
-function redrawTable() {
-	var selectedList = window.selectedList;
-	var maybeList = window.maybeList;
+// Make an array of assignments for all VEs
+function assignEveryone() {
+	var finalRoomAssignments = {};
 	var roomCount = Number(document.getElementById(roomCountID).value);
-	var showSessions = document.getElementById(showSessionsID).checked;
+	var roomNum;
+	var roomPass;
 	
-	var htmlOutput = "<center><table><tr>";
-	
-	for (let i = 1; i <= roomCount; i++) {
-		htmlOutput += "<th>Room "+i+"</th>";
+	// First fill the object with an array for each special and regular room
+	window.specialRooms.forEach(function (item,index) {
+		finalRoomAssignments[item] = [];
+	});
+
+	for (roomNum = 1; roomNum <= roomCount; roomNum++) {
+		finalRoomAssignments[standardRoomName(roomNum)] = [];
 	}
-	htmlOutput += "</tr>";
-	
-	var count=0;
-	selectedList.forEach(function (item, index) {
-		if (!veHasSpecialAssignment(item.veNumber)) {
-			if (count == 0) {
-				htmlOutput += "<tr>";
-			} else if (count%roomCount == 0) {
-				htmlOutput += "</tr><tr>";		
+
+	// Now place the VEs who have special assignments
+	for (var index in window.roomAssignments) {
+		var assignment = window.roomAssignments[index];
+		if (assignment["room"] && assignment["veNumber"]) {
+			if (assignment["room"] in finalRoomAssignments) {
+				finalRoomAssignments[window.roomAssignments[index]["room"]].push(window.roomAssignments[index]["veNumber"]);
+			} else {
+				console.log("Room " + assignment["room"] + " does not exist");
 			}
-			htmlOutput += "<td>";
-			htmlOutput += item.veNumber+"-"+item.veCallSign+" "+item.vePreferredName;
-			if (showSessions) {
-				htmlOutput += " ("+item.overallSessionCount+")";
+		}
+	}
+
+	// Now place the unassigned VEs across the numbered rooms
+	roomNum = 1;
+	roomPass = 0; 
+	window.selectedList.forEach(function (ve, index) {
+		if (!veHasSpecialAssignment(ve.veNumber)) {
+
+			// find the next slot
+			while (finalRoomAssignments[standardRoomName(roomNum)].length > roomPass) {
+				roomNum++;
+				if (roomNum > roomCount) {
+					roomNum = 1;
+					roomPass++;
+				}
 			}
-			htmlOutput += "</td>";
-			count += 1;
+
+			finalRoomAssignments[standardRoomName(roomNum)].push(veID(ve));
 		}
 	});
-	
-	htmlOutput += "</tr>";
 
-	if (maybeList.length > 0) {
-		maybeList.forEach(function (item, index) {
-			if (index == 0) {
-				htmlOutput += "<tr>";
-			} else if (index%roomCount == 0) {
-				htmlOutput += "</tr><tr>";
+	// Now place the maybes across the numbered rooms
+	window.maybeList.forEach(function (maybe, index) {
+		if (!veHasSpecialAssignment(maybe)) {
+
+			// find the next slot
+			while (finalRoomAssignments[standardRoomName(roomNum)].length > roomPass) {
+				roomNum++;
+				if (roomNum > roomCount) {
+					roomNum = 1;
+					roomPass++;
+				}
 			}
+
+			finalRoomAssignments[standardRoomName(roomNum)].push(maybe);
+		}
+	})
+
+	window.finalRoomAssignments = finalRoomAssignments;
+}
+
+function redrawTable() {
+	var roomCount = Number(document.getElementById(roomCountID).value);
+	var showSessions = document.getElementById(showSessionsID).checked;
+	var maxRoomSize = 0;
+	
+	assignEveryone();
+
+	var htmlOutput = "";
+
+	// first we display the standard rooms
+	htmlOutput += "<center><table>";
+	
+	htmlOutput += "<tr>";
+	for (let roomNum = 1; roomNum <= roomCount; roomNum++) {
+		htmlOutput += "<th>"+standardRoomName(roomNum)+"</th>";
+		// need to know the largest room size for the next step
+		if (finalRoomAssignments[standardRoomName(roomNum)].length > maxRoomSize) {
+			maxRoomSize = finalRoomAssignments[standardRoomName(roomNum)].length;
+		}
+	}
+	htmlOutput += "</tr>";
+	
+	for (let row = 0; row < maxRoomSize; row++) {
+		htmlOutput += "<tr>";
+		for (let roomNum = 1; roomNum <= roomCount; roomNum++) {
 			htmlOutput += "<td>";
-			htmlOutput += item;
-			if (showSessions) {
-				htmlOutput += " (?)";
+			if (finalRoomAssignments[standardRoomName(roomNum)].length > row) {
+				htmlOutput += veDisplay(finalRoomAssignments[standardRoomName(roomNum)][row]);
+			} else {
+				htmlOutput += "&nbsp;";
 			}
 			htmlOutput += "</td>";
-		})
+		}
+		htmlOutput += "</tr>";
 	}
 
+	htmlOutput += "</table></center>";
+	
+	htmlOutput += "<br>";
+	
+	// next we display the special rooms
+	htmlOutput += "<center><table>";
+	
+	htmlOutput += "<tr>";
+	window.specialRooms.forEach(function (roomName,index) {
+		htmlOutput += "<th>"+roomName+"</th>";
+		// need to know the largest room size for the next step
+		if (finalRoomAssignments[roomName].length > maxRoomSize) {
+			maxRoomSize = finalRoomAssignments[roomName].length;
+		}
+	});
 	htmlOutput += "</tr>";
+	
+	for (let row = 0; row < maxRoomSize; row++) {
+		htmlOutput += "<tr>";
+		window.specialRooms.forEach(function (roomName,index) {
+			htmlOutput += "<td>";
+			if (finalRoomAssignments[roomName].length > row) {
+				htmlOutput += veDisplay(getVEbyID(finalRoomAssignments[roomName][row]));
+			} else {
+				htmlOutput += "&nbsp;";
+			}
+			htmlOutput += "</td>";
+		});
+		htmlOutput += "</tr>";
+	}
 
 	htmlOutput += "</table></center>";
 	
@@ -136,7 +258,7 @@ function redrawTable() {
 	
 }
 
-function inputChange() {
+function veInputParse() {
 	var input = document.getElementById(inputID).value;
 	var inputList = input.split(/\W+/);
 	var selectedList = [];
@@ -170,25 +292,41 @@ function inputChange() {
 	
 	maybeList.sort();
 	window.maybeList = maybeList;
-	
+}
+
+function veInputUpdated() {
+	veInputParse();
+
+	// Update VE Count
 	var countText = selectedList.length+" VE"+ (selectedList.length==1 ? "" : "s") +" found";
 	countText += (maybeList.length==0?"": " plus "+maybeList.length+" possible new VE"+ (maybeList.length==1 ? "" : "s") );
 	document.getElementById(veCountID).innerHTML = countText;
-	
-	var dataList = document.getElementById(assignmentDataListID);
-	dataList.innerHTML = null;
-	for (var i in selectedList) {
-		var choice = selectedList[i].veNumber+"-"+selectedList[i].veCallSign+" "+selectedList[i].vePreferredName;
-		var op=document.createElement("option"); 
-		op.setAttribute("label",choice);
-		op.setAttribute("value",choice); 
-		dataList.appendChild(op);
-	}
-	
-	roomAssignmentsUpdated(); // will remove VEs from special assignments if they have been removed from VE List
-	redrawTable();
 
-	return true;
+	updateVEDataList();
+	checkAssignmentsAndRedraw();
+}
+
+
+var pauseCheck = false;
+function checkAssignmentsAndRedraw() {
+	if (!pauseCheck) {
+		// check
+		validateRoomAssignments(); // will remove VEs if they have been removed from VE List or if rooms no longer exist
+
+		// redraw
+		displayRoomAssignments();
+		redrawTable();
+	}
+}
+
+function roomCountUpdated() {
+	updateRoomDataList();
+	checkAssignmentsAndRedraw();
+}
+
+function showSessionCountUpdated() {
+	updateVEDataList();
+	checkAssignmentsAndRedraw();
 }
 
 function veIsParticipating(veNumber) {
@@ -199,13 +337,13 @@ function veIsParticipating(veNumber) {
 		}
 		return result;  // this is for the "some"
 	});
-	return result; // this is for the function
+	return (result || window.maybeList.includes(veNumber)); // this is for the function
 }
 
 function veHasSpecialAssignment(veNumber) {
 	var result = false;
 	window.roomAssignments.some(function (item, index) {
-		if (item.veNumber === veNumber) {
+		if ((item.veNumber === veNumber) && (item.room)){
 			result = true;
 		}
 		return result;  // this is for the "some"
@@ -213,20 +351,62 @@ function veHasSpecialAssignment(veNumber) {
 	return result; // this is for the function)
 }
 
+function updateVEDataList() {
+	var dataList = document.getElementById(assignmentDataListID);
+	dataList.innerHTML = null;
+	window.selectedList.forEach(function (ve, index) {
+		var op=document.createElement("option"); 
+		op.setAttribute("data-value",ve.veNumber); 
+		op.innerText = veDisplay(ve);
+		dataList.appendChild(op);
+	});
+	window.maybeList.forEach(function (maybe, index) {
+		var op=document.createElement("option"); 
+		op.setAttribute("data-value",maybe); 
+		op.innerText = maybe;
+		console.log(maybe);
+		dataList.appendChild(op);
+	});
+}
+
+function getVEfromDataListValue(value) {
+	var options = document.querySelectorAll('#' + assignmentDataListID + ' option');
+	var result = "";
+	
+    for (var i = 0; i < options.length; i++) {
+        var option = options[i];
+
+		if(option.innerText === value) {
+            result = option.getAttribute('data-value');
+			break;
+        }
+    } 
+    return result;
+}
+
+function validateRoomAssignments() {
+	var roomAssignments = [];
+	window.roomAssignments.forEach(function (roomAssignment, index) {
+		if (veIsParticipating(roomAssignment.veNumber)) {
+			roomAssignments.push(roomAssignment);
+		}
+	});
+	window.roomAssignments = roomAssignments;
+}
+
 function roomAssignmentsUpdated() {
 	var count=0;
 	var roomAssignments = [];
 	while (document.getElementById(assignmentNumberPrefix+count.toString()) !== null) {
-		var veDisplay = document.getElementById(assignmentNumberPrefix+count.toString()).value;
-		var veNumber = veDisplay.split("-")[0];
+		var veNumber = getVEfromDataListValue(document.getElementById(assignmentNumberPrefix+count.toString()).value);
 		var room = document.getElementById(assignmentRoomPrefix+count.toString()).value;
-		var assignment = {"veNumber": veNumber, "veDisplay": veDisplay, "room": room};
-		if (veIsParticipating(veNumber)) {
-			roomAssignments.push(assignment);
-		}
+		var assignment = {"veNumber": veNumber, "room": room};
+		roomAssignments.push(assignment);
 		count += 1;
 	}
 	window.roomAssignments = roomAssignments;
+
+	validateRoomAssignments();
 	displayRoomAssignments();
 	redrawTable();
 	
@@ -246,7 +426,7 @@ function displayRoomAssignments() {
 	for (var index in window.roomAssignments) {
 		assignment = window.roomAssignments[index];
 		innerHTML += "<tr>"
-		innerHTML += "<td><input id='"+assignmentNumberPrefix+count.toString()+"' value='"+assignment["veDisplay"]+"' list='"+assignmentDataListID+"' size="+assignmentNumberWidth+" onchange='roomAssignmentsUpdated();'></td>";
+		innerHTML += "<td><input id='"+assignmentNumberPrefix+count.toString()+"' data-value='"+assignment["veNumber"]+"' value='"+veDisplay(assignment["veNumber"])+"' list='"+assignmentDataListID+"' size="+assignmentNumberWidth+" onchange='roomAssignmentsUpdated();'></td>";
 		innerHTML += "<td><input id='"+assignmentRoomPrefix+count.toString()+"' value='"+assignment["room"]+"' list='"+specialRoomDataListID+"' size="+assignmentRoomWidth+" onchange='roomAssignmentsUpdated();'></td>";
 		innerHTML += "<td><p onclick='removeAssignment("+count.toString()+")' style='cursor:default;'>&#x2715;</p></td>";
 		innerHTML += "</tr>";
@@ -260,9 +440,27 @@ function displayRoomAssignments() {
 	innerHTML += "</table>";
 	
 	document.getElementById(assignmentDivID).innerHTML = innerHTML;
+}
 
-// var assignmentNumberPrefix = "assignmentNumber";
-// var assignmentRoomPrefix = "assignmentRoom";
+function updateRoomDataList() {
+	var roomCount = Number(document.getElementById(roomCountID).value);
+	var dataList = document.getElementById(specialRoomDataListID);
+	dataList.innerHTML = null;
+
+	// Add the special rooms
+	window.specialRooms.forEach(function (room, index) {
+		var op=document.createElement("option"); 
+		op.setAttribute("label",room);
+		op.setAttribute("value",room); 
+		dataList.appendChild(op);
+	});
+	// Add the regular rooms
+	for (roomNum = 1; roomNum <= roomCount; roomNum++) {
+		var op=document.createElement("option"); 
+		op.setAttribute("label",standardRoomName(roomNum));
+		op.setAttribute("value",standardRoomName(roomNum)); 
+		dataList.appendChild(op);
+	}
 }
 
 function specialRoomListUpdated() {
@@ -270,17 +468,7 @@ function specialRoomListUpdated() {
 	var roomList = input.split(/\W+/);
 	window.specialRooms = roomList;
 	
-	var dataList = document.getElementById(specialRoomDataListID);
-	dataList.innerHTML = null;
-// 	for (var i=0; i<dataList.options.length; i++) {
-// 		dataList.options[i].remove();
-// 	}
-	for (var room in roomList) {
-		var op=document.createElement("option"); 
-		op.setAttribute("label",roomList[room]);
-		op.setAttribute("value",roomList[room]); 
-		dataList.appendChild(op);
-	}
+	updateRoomDataList();
 }
 
 function displaySpecialRoomList() {
@@ -338,8 +526,15 @@ function dataFileNameUpdated () {
 		document.getElementById(roomCountID).value = data["roomCount"];
 		document.getElementById(showSessionsID).checked = data["showSessions"];
 		window.roomAssignments = data["roomAssignments"];
+
+		pauseCheck = true;
+		veInputUpdated();
+		roomCountUpdated();
+		showSessionCountUpdated();
+		specialRoomListUpdated();
 		displayRoomAssignments();
-		inputChange();
+		pauseCheck = false;
+		checkAssignmentsAndRedraw();
 	}
   }	
 }
@@ -373,9 +568,9 @@ td {
 	top: 0;
 	left: 0;
 	width: 100%;
-	z-index: 10;
+	z-index: 100;
 	background-color: rgba(0,0,0,0.5);
-	padding: 25px;
+	padding: 175px 0px;
 }
 #warning {
 	width: 50%;
@@ -398,6 +593,39 @@ td {
   content: "";
   display: table;
   clear: both;
+}
+
+.byLine {
+	position: fixed; 
+	bottom: 10; 
+	right: 10; 
+	padding: 5; 
+	border-radius: 5px;
+    background: #cacaca73;
+	background-color: #cacaca73; 
+	font-size: x-small;
+	width: 6em;
+	text-align: center;
+	z-index: 1000;
+}
+
+.byLine:hover #support {
+	display: block;
+}
+
+.support {
+	position: fixed; 
+	width: 200px;
+	display: none;
+	bottom: 30; 
+	right: 10; 
+	padding: 5; 
+	border-radius: 5px;
+    background: #cacaca73;
+	background-color: #cacaca73; 
+	font-size: x-small;
+	text-align: left;
+	z-index: 999;
 }
 
 </style>
@@ -423,13 +651,13 @@ td {
 		<div id="inputDiv" class="column">
 		<center>
 			<h2>VE List</h2>
-			<textarea id="veInput" rows="10" cols="30" placeholder="Paste a list of VE #s or Callsigns here..." onchange="inputChange();"></textarea>
+			<textarea id="veInput" rows="10" cols="30" placeholder="Paste a list of VE #s or Callsigns here..." onchange="veInputUpdated();"></textarea>
 			<br>
 			<div id=veCount>0 VEs found</div>
 			<br>
-			Rooms: <input type=number id=roomCount value=1 min=1 max=20 onchange="redrawTable();"/>
+			Rooms: <input type=number id=roomCount value=1 min=1 max=20 onchange="roomCountUpdated();"/>
 			<br>
-			<input type=checkbox id=showSessions checked onchange="redrawTable();"> Show session count
+			<input type=checkbox id=showSessions checked onchange="showSessionCountUpdated();"> Show session count
 		</center>
 		</div>
 		
@@ -469,6 +697,15 @@ td {
 
 
 	<div id="statsOutput">
+	</div>
+
+	<div id="byLine" class="byLine">
+		by AK6DM
+		<div id="support" class="support">
+			&#128519; If using this page saves you time, consider supporting my efforts by giving credit for your sessions. 	
+			<br>
+			Every little bit helps in my quest for 150!
+		</div>
 	</div>
 </body>
 </html>
