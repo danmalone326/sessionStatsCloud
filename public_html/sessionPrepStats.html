@@ -375,6 +375,30 @@ function distributeUnassignedVEs() {
 	redrawAssignments();
 }
 
+function unassignExamRoomVEs() {
+	var roomCount = Number(document.getElementById(roomCountID).value);
+	for (let roomNum = 1; roomNum <= roomCount; roomNum++) {
+		var roomName = standardRoomName(roomNum);
+		window.roomAssignments[roomName] = [];
+	}
+	redrawAssignments();
+}
+
+function unassignSpecialRoomVEs() {
+	window.specialRooms.forEach(function (roomName,index) {
+		window.roomAssignments[roomName] = [];
+	});
+	redrawAssignments();
+}
+
+function removeUnassignedVEs() {
+	window.unassignedVEs.forEach(function (veNumber, index) {
+		removeVEfromParticipating(veNumber);
+	});
+	findUnassignedVEs();
+	displayUnassignedVEs();
+}
+
 function redrawAssignments() {
 	redrawTable();
 	displayUnassignedVEs();
@@ -484,11 +508,22 @@ function roomSelected(roomName) {
 	if (window.selectedVE != "") {
 		moveVEtoRoom(window.selectedVE,roomName);
 		redrawAssignments();
+	} else if (roomName === "") {
+		toggleDisplayHiddenButtons();
 	}
 }
 
 function roomSelectJS(roomName) {
 	return "onclick=\"roomSelected('" + roomName + "');\"";
+}
+
+function toggleDisplayHiddenButtons() {
+	var hiddenButtons = document.getElementById("hiddenButtons");
+	if (!hiddenButtons.style.display || (hiddenButtons.style.display === "none")) {
+		hiddenButtons.style.display = "inline";
+	} else {
+		hiddenButtons.style.display = "none";
+	}
 }
 
 function redrawTable() {
@@ -567,10 +602,6 @@ function redrawTable() {
 	
 	document.getElementById(assignmentsID).innerHTML = htmlOutput;
 }
-
-
-
-
 
 function saveData() {
 	var data = {"version": 2.0,
@@ -752,6 +783,24 @@ td {
 	background-color: lightblue;
 }
 
+#hiddenButtons {
+	display: none;
+}
+
+.zoomRedButton {
+	background-color: #ff0000; /* Green */
+	border: none;
+	color: white;
+	padding: 5px 10px;
+	text-align: center;
+	text-decoration: none;
+	display: inline-block;
+	border-radius: 8px;
+	font-size: 14px;
+	margin: 4px 2px;
+	cursor: pointer;
+}
+
 .byLine {
 	position: fixed; 
 	bottom: 10; 
@@ -902,6 +951,11 @@ td {
 		<div id="unassigned">
 			<center>
 			<button onclick="distributeUnassignedVEs();">Distribute Unassigned VEs to Rooms</button>
+			<div id="hiddenButtons">
+				<button class="zoomRedButton" onclick="unassignExamRoomVEs();">Unassign ALL VEs from Exam Rooms</button>
+				<button class="zoomRedButton" onclick="unassignSpecialRoomVEs();">Unassign ALL VEs from Special Rooms</button>
+				<button class="zoomRedButton" onclick="removeUnassignedVEs();">Remove Unassigned VEs from Session</button>
+			</div>
 			<div id="unassignedTable">				
 			</div>
 			</center>
@@ -951,6 +1005,7 @@ Step 6.<br>
 If you want to move people around at any time, just select the VE and select the room you want to move them too. 
 If you want to swap 2 VEs, select one, then the other. If you want to unassign, select the VE, then select the Unassigned room. 
 If you want to remove a VE from the session, select the VE and click the "Remove ? from Session" button. 
+To show/hide the RED buttons, click the Unassigned room header.
 <br>
 Step 7.<br>
 If you mess up, don't worry... Oh wait, Undo is not implemented, so do worry...  
