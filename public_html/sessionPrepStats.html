@@ -584,7 +584,7 @@ function saveData() {
 	var jsonData = [JSON.stringify(data)];
 	var blobData = new Blob(jsonData, { type: "text/plain;charset=utf-8" });
 	
-	var defaultFileName = "sessionSetup-" + document.getElementById(sessionID).value + ".json";
+	var defaultFileName = "sessionSetup" + (document.getElementById(sessionID).value === "" ? "" : "-" + document.getElementById(sessionID).value) + ".json";
 	
 	//Check the Browser.
 	var isIE = false || !!document.documentMode;
