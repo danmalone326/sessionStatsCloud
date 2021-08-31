@@ -346,7 +346,7 @@ function displaySpecialRoomList() {
 
 function specialRoomListUpdated() {
 	var input = document.getElementById(specialRoomInputID).value;
-	var roomList = input.replace(/^\s+|\s+$/g, '').split(/\W+/);
+	var roomList = input.replace(/^\s+|\s+$/g, '').replace(/\s*\n\s*/g, '\n').split(/\n/);
 	window.specialRooms = roomList;
 	
 	updateRoomArray();
