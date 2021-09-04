@@ -92,7 +92,11 @@ function getJSON(url, index, name, callback) {
 		}
 	};
 	xhr.send();
-	window.sessionData.applicants[index].data[pendingKey]++;
+	
+	// special check to let me use this same function for single lookups.
+	if(index && (index<1000)) {
+		window.sessionData.applicants[index].data[pendingKey]++;
+	}
 };
 
 function jsonCallback(err, data, index, name) {
@@ -421,6 +425,113 @@ function dataFileNameUpdated() {
   }	
 }
 
+function searchOne() {
+	var frn=document.getElementById('frnInput').value.trim();
+	var callsign=document.getElementById('callsignInput').value.trim().toUpperCase();
+
+	if (!(frn.match(/^\d*$/))) {
+		frn="";
+	}
+	if (!(callsign.match(/^[A-Z]{1,2}\d[A-Z]{1,3}$/))) {
+		callsign="";
+	}
+
+	if ((frn != "") || (callsign != "")) {
+		var jsonURL = licenseSearchURLPrefix;
+		if (frn != "") {
+			jsonURL += "frn=" + frn;
+			if (callsign != "") {
+				jsonURL += "&";
+			}
+		}
+		if (callsign != "") {
+			jsonURL += "callsign=" + callsign;
+		}
+
+		jsonRequestQueue.push({"url": jsonURL, "index": -1, "name": -1});
+		updateProgress();
+
+		getJSON(jsonURL,frn,callsign,displayOne);
+		// addJSONRequest(jsonURL, index, ulsDataKey);
+	} else {
+		displayErrorOutput();
+	}
+}
+
+function displayOne(err, data, frn, callsign) {
+	var htmlOutput = "";
+
+	jsonRequestQueue.shift();
+	updateProgress();
+
+	if (err !== null) {
+		console.log('Something is odd in displayOne: ' + err + ", index: " + index + ", name: " + name);
+	} else {
+		htmlOutput += "<center>"
+		htmlOutput += "<table class='coresTable'>";
+		htmlOutput += "<tr>";
+		htmlOutput += "<th>FRN</th>";
+		htmlOutput += "<th>Call Sign</th>";
+		htmlOutput += "<th>Status</th>";
+		htmlOutput += "<th></th>";
+		htmlOutput += "</tr>";
+
+		data.forEach(function (item, index) {
+			item.licDetailURL = item.licDetailURL.replace("http://","https://");
+			htmlOutput += "<tr>";
+
+			dataClass = matchValueClass;
+			if (item.frn !== frn){
+				dataClass = differentValueClass;
+			}
+			htmlOutput += "<td class='" + dataClass + "'>" + item.frn + "</td>";
+
+			dataClass = matchValueClass;
+			if (item.callsign !== callsign) {
+				dataClass = differentValueClass;
+			}
+			htmlOutput += "<td class='" + dataClass + "'>" + item.callsign + "</td>";
+
+			htmlOutput += "<td>" + item.statusDesc + "</td>";
+
+			var formID = coresFormPrefix + "-" + item.licenseID;
+			htmlOutput += "<td>";
+			htmlOutput += "<form id='" + formID + 
+							"' target='" + coresPopupTarget + 
+							"' action='" + item.licDetailURL + 
+							"' method='POST' >";
+			htmlOutput += "<button onclick='coresPopup(\"" + formID + "\")'>Open ULS Entry</button>";
+			htmlOutput += "</td>";
+			htmlOutput += "</form>";
+			htmlOutput += "</tr>";
+		});
+
+		htmlOutput += "</table>"
+
+		if (frn && (frn != "")) {
+			htmlOutput += "<br>";
+			htmlOutput += coresFrnSearchHTML(frn);
+		}
+		htmlOutput += "</center>"
+	}
+
+	document.getElementById(outputID).innerHTML = htmlOutput;
+}
+
+function displayErrorOutput(message) {
+	var htmlOutput = "";
+
+	htmlOutput += "<center>"
+	htmlOutput += "An error has occurred.<br>";
+	if (message) {
+		htmlOutput += message;
+	}
+	htmlOutput += "</center>"
+
+
+	document.getElementById(outputID).innerHTML = htmlOutput;
+}
+
 function onLoad() {
 	checkDisplayWarning(); 
 	return true;
@@ -430,7 +541,7 @@ function onLoad() {
 
 <style type="text/css">
 td {
-    padding:2 15px;
+    padding: 2 15px;
     white-space: nowrap;
 }
 #statsOutput {
@@ -549,6 +660,21 @@ td {
 	z-index: 999;
 }
 
+.input {
+	display: inline-block;
+	padding: 0px 10px;
+}
+
+#inputWrapper {
+	display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+#inputOneFieldWrapper {
+	text-align: right;
+}
+
 </style>
 
 </head>
@@ -565,15 +691,33 @@ td {
 		<center>
 			<h1>GLAARG Session Applicant Info Check</h1>
 			<form onsubmit="return false;">
-				<input type=file id="loadDataFileName" style="display:none;" onchange="dataFileNameUpdated();">
-				<button onclick="loadData()">Load Session Applicant JSON</button>
+				<div id="inputWrapper">
+					<div id="inputJSON" class="input">
+						<input type=file id="loadDataFileName" style="display:none;" onchange="dataFileNameUpdated();">
+						<button onclick="loadData()">Load Session Applicant JSON</button>
+					</div>
+					<div id="inputOr" class="input">
+						&#8212;OR&#8212;
+					</div>
+					<div id="inputOne" class="input">
+						<center>
+							<div id="inputOneFieldWrapper">
+								<label for="frnInput">FRN</label>
+								<input type="text" name="frnInput" id="frnInput" size=15 maxlength=10>
+								<br>
+								<label for="callsignInput">Callsign</label>
+								<input type="text" name="callsignInput" id="callsignInput" size=15 maxlength=6>
+							</div>
+							<button onclick='searchOne();'>Search</button>
+						</center>
+					</div>
+				</div>
 			</form>
 
 			<div id="warning" class="alertBox">This file will not leave your machine.<br>
 				FRN and callsign will be used to query FCC and ET databases.</div>
 			
 			<div id="progress" class="alertBox">
-test
 			</div>
 		</center>
 	</div>
