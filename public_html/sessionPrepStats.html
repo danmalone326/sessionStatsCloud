@@ -644,11 +644,12 @@ function downloadZoomTemplate() {
 	zoomEmailCounter = 1;
 	csv += "Pre-assign Room Name,Email Address\r\n";
 	window.specialRooms.forEach(function (roomName,index) {
-		if (roomName.toUpperCase != "MAIN") {
+		if (roomName.toUpperCase() != "MAIN") {
 			csv += zoomRoomTemplate(roomName);
 		}
 	});
 
+	var roomCount = Number(document.getElementById(roomCountID).value);
 	for (let roomNum = 1; roomNum <= roomCount; roomNum++) {
 		var roomName = standardRoomName(roomNum);
 		csv += zoomRoomTemplate(roomName);
@@ -660,7 +661,7 @@ function downloadZoomTemplate() {
 
 	var blobData = new Blob([csv], { type: "text/csv;charset=utf-8" });
 	
-	var defaultFileName = "zoomRoomTemplate" + (document.getElementById(sessionID).value === "" ? "" : "-" + document.getElementById(sessionID).value) + ".json";
+	var defaultFileName = "zoomRoomTemplate" + (document.getElementById(sessionID).value === "" ? "" : "-" + document.getElementById(sessionID).value) + ".csv";
 	
 	//Check the Browser.
 	var isIE = false || !!document.documentMode;
