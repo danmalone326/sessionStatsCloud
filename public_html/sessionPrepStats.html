@@ -11,19 +11,15 @@ var jsonURL = "https://glaarglookup.n1cck.com/websiteStatsDetail"
 var inputID = "veInput";
 var veCountID = "veCount";
 var roomCountID = "roomCount";
+var examRoomLabelID = "examRoomLabel";
 var showSessionsID = "showSessions";
 var veDataListID = "veDataList";
 var participatingCountID = "participatingCount";
 var sessionID = "sessionID";
 var specialActionsID = "specialActions";
 
-// var assignmentDivID = "roomAssignmentDiv";
-// var assignmentNumberPrefix = "assignmentNumber";
-// var assignmentRoomPrefix = "assignmentRoom";
-// var assignmentNumberWidth = 30;
-// var assignmentRoomWidth = 15;
-
 var specialRoomInputID = "specialRoomInput";
+var extraZoomRoomsInputID = "extraZoomRoomsInput";
 
 var loadDataFileNameID = "loadDataFileName";
 
@@ -31,12 +27,13 @@ var assignmentsID = "assignments";
 var unassignedID = "unassigned";
 var unassignedTableID = "unassignedTable";
 
-var standardRoomPrefix = "Room ";
+var examRoomLabel = "Exam ";
 
 // These variables are saved 
 window.participatingVEs = [];
 window.roomAssignments = {}; 
 window.specialRooms = ['Main','Welcome','Precheck','Ready'];
+window.extraZoomRooms = ['VE Lounge','Overflow Alpha','Overflow Bravo','Overflow Charlie','Overflow Delta'];
 
 // These are not saved
 window.stats = "";
@@ -44,9 +41,7 @@ window.parsedVEs = [];
 window.unassignedVEs = [];
 window.selectedVE = "";
 
-// window.maybeVEs = []; // window.maybeList = [];
-// window.roomAssignments = [];
-// window.finalRoomAssignments = {};
+var myMinCellWidthHack = new Array(16).join( "&nbsp;" );
 
 function checkDisplayWarning() {
 	if (document.location.href.includes('glaarg-test')) {
@@ -97,7 +92,7 @@ function findVEinStats(veID) {
 }
 
 function standardRoomName(i) {
-	return standardRoomPrefix + i;
+	return examRoomLabel + i;
 }
 
 function isStandardRoomName(name) {
@@ -307,7 +302,7 @@ function updateRoomArray() {
 	// First remove any extra rooms
 	for (let room in window.roomAssignments) {
 		if ((window.specialRooms.includes(room)) ||
-			 (room.startsWith(standardRoomPrefix) && (room.substr(standardRoomPrefix.length) <= roomCount))) {
+			 (room.startsWith(examRoomLabel) && (room.substr(examRoomLabel.length) <= roomCount))) {
 			continue;
 		} else {
 			delete window.roomAssignments[room];
@@ -332,8 +327,26 @@ function updateRoomArray() {
 function roomCountUpdated() {
 	updateRoomArray();
 	redrawAssignments();
-	// updateRoomDataList();
-	// checkAssignmentsAndRedraw();
+}
+
+// if the exam room label changes, we need to update all the existing rooms
+function examRoomLabelUpdated() {
+	var newExamRoomLabel = document.getElementById(examRoomLabelID).value;
+	if (newExamRoomLabel != examRoomLabel) {
+		var roomCount = Number(document.getElementById(roomCountID).value);
+		for (let roomNum = 1; roomNum <= roomCount; roomNum++) {
+			roomName = standardRoomName(roomNum);
+			newRoomName = newExamRoomLabel + roomNum;
+			roomAssignments[newRoomName] = roomAssignments[roomName];
+			delete roomAssignments[roomName];
+		}
+		examRoomLabel = newExamRoomLabel;
+		redrawAssignments();
+	}
+}
+
+function displayExamRoomLabel() {
+	document.getElementById(examRoomLabelID).value = examRoomLabel;
 }
 
 function showSessionCountUpdated() {
@@ -348,6 +361,19 @@ function specialRoomListUpdated() {
 	var input = document.getElementById(specialRoomInputID).value;
 	var roomList = input.replace(/^\s+|\s+$/g, '').replace(/\s*\n\s*/g, '\n').split(/\n/);
 	window.specialRooms = roomList;
+	
+	updateRoomArray();
+	redrawAssignments();
+}
+
+function displayExtraZoomRoomsList() {
+	document.getElementById(extraZoomRoomsInputID).value = window.extraZoomRooms.join("\n");
+}
+
+function extraZoomRoomsListUpdated() {
+	var input = document.getElementById(extraZoomRoomsInputID).value;
+	var roomList = input.replace(/^\s+|\s+$/g, '').replace(/\s*\n\s*/g, '\n').split(/\n/);
+	window.extraZoomRooms = roomList;
 	
 	updateRoomArray();
 	redrawAssignments();
@@ -566,8 +592,12 @@ function redrawTable() {
 		htmlOutput += "</tr>";
 	}
 
-	// blank row for a break
-	htmlOutput += "<tr><td>&nbsp;</td></tr>";
+	// blank row for a break and to set minimum cell width (hack)
+	htmlOutput += "<tr>";
+	for (let roomNum = 1; roomNum <= roomCount; roomNum++) {
+		htmlOutput += "<td>" + myMinCellWidthHack + "</td>";
+	}
+	htmlOutput += "</tr>";
 	
 	// next we display the special rooms
 	htmlOutput += "<tr>";
@@ -603,14 +633,62 @@ function redrawTable() {
 	document.getElementById(assignmentsID).innerHTML = htmlOutput;
 }
 
+var zoomEmailCounter = 0;
+function zoomRoomTemplate(roomName) {
+	return roomName + ",glaarg-zoom-" + zoomEmailCounter++ + "@glaarg.org" + "\r\n";
+}
+
+function downloadZoomTemplate() {
+	var csv = "";
+
+	zoomEmailCounter = 1;
+	csv += "Pre-assign Room Name,Email Address\r\n";
+	window.specialRooms.forEach(function (roomName,index) {
+		if (roomName.toUpperCase() != "MAIN") {
+			csv += zoomRoomTemplate(roomName);
+		}
+	});
+
+	var roomCount = Number(document.getElementById(roomCountID).value);
+	for (let roomNum = 1; roomNum <= roomCount; roomNum++) {
+		var roomName = standardRoomName(roomNum);
+		csv += zoomRoomTemplate(roomName);
+	}
+
+	window.extraZoomRooms.forEach(function (roomName,index) {
+		csv += zoomRoomTemplate(roomName);
+	});
+
+	var blobData = new Blob([csv], { type: "text/csv;charset=utf-8" });
+	
+	var defaultFileName = "zoomRoomTemplate" + (document.getElementById(sessionID).value === "" ? "" : "-" + document.getElementById(sessionID).value) + ".csv";
+	
+	//Check the Browser.
+	var isIE = false || !!document.documentMode;
+	if (isIE) {
+		alert("Internet Explorer not supported.");
+	} else {
+		var url = window.URL || window.webkitURL;
+		link = url.createObjectURL(blobData);
+		var a = document.createElement("a");
+		a.download = defaultFileName;
+		a.href = link;
+		document.body.appendChild(a);
+		a.click();
+		document.body.removeChild(a);
+	}
+}
+
 function saveData() {
 	var data = {"version": 2.0,
 				"sessionID": document.getElementById(sessionID).value,
 				"roomCount": document.getElementById(roomCountID).value,
+				"examRoomLabel": examRoomLabel,
 				"showSessions": document.getElementById(showSessionsID).checked,
 				"specialRooms": window.specialRooms,
 				"participatingVEs": window.participatingVEs,
 				"roomAssignments": window.roomAssignments,
+				"extraZoomRooms": window.extraZoomRooms,
 				};
 	var jsonData = [JSON.stringify(data)];
 	var blobData = new Blob(jsonData, { type: "text/plain;charset=utf-8" });
@@ -661,6 +739,18 @@ function dataFileNameUpdated () {
 				window.participatingVEs = data.participatingVEs;
 				window.roomAssignments = data.roomAssignments;
 
+				if ("extraZoomRooms" in data) {
+					window.extraZoomRooms = data.extraZoomRooms;
+					displayExtraZoomRoomsList();
+				}
+
+				if ("examRoomLabel" in data) {
+					examRoomLabel = data.examRoomLabel;
+				} else {
+					examRoomLabel = "Room "; // needed to support old save files
+				}
+				displayExamRoomLabel();
+				
 				refreshParticipatingVEsData();
 				displaySpecialRoomList();
 				updateParticipatingVEsCount();
@@ -700,12 +790,11 @@ function onLoad() {
 	loadJSON();
 	checkDisplayWarning(); 
 	displaySpecialRoomList();
-	// specialRoomListUpdated();
+	displayExtraZoomRoomsList();
+	displayExamRoomLabel();
 	updateRoomArray();
 	updateParticipatingVEsCount();
 	redrawAssignments();
-	// displayRoomAssignments();
-	// redrawTable();
 	document.getElementById("veInput").focus(); 
 	return true;
 }
@@ -769,7 +858,7 @@ td {
 
 .column {
   float: left;
-  width: 33.33%;
+  width: 25%;
 }
 
 /* Clear floats after the columns */
@@ -910,7 +999,7 @@ td {
 			<br>
 			<div id=veCount>0 VEs found</div>
 			<br>
-			<button onclick="addParsedToParticipating()">Add found VEs to Session</button>
+			<button onclick="addParsedToParticipating();">Add found VEs to Session</button>
 		</center>
 		</div>
 		
@@ -920,6 +1009,8 @@ td {
 			Session: <input id=sessionID size=10/>
 			<p>
 			Exam Rooms: <input type=number id=roomCount value=4 min=1 max=20 onchange="roomCountUpdated();"/>
+			<p>
+			Exam Room Label: <input id="examRoomLabel" size=10 onchange="examRoomLabelUpdated();"/>
 			<p>
 			<input type=checkbox id=showSessions checked onchange="showSessionCountUpdated();"> Show session count next to VEs
 			<p>
@@ -936,17 +1027,25 @@ td {
 			</center>
 		</div>
 		
+		<div id="extraZoomRoomsDiv" class="column">
+			<center>
+			<h2>Extra Zoom Rooms</h2>
+			<textarea id="extraZoomRoomsInput" rows="10" cols="30" placeholder="Paste a list of extra Zoom rooms here..." onchange="extraZoomRoomsListUpdated();"></textarea>
+			<br>
+			<br>
+			<button onclick="downloadZoomTemplate();">Download Zoom Room Template</button>
+			</center>
+		</div>
 	</div>
 
-	<input type=file id="loadDataFileName" style="display:none;" onchange="dataFileNameUpdated();">
 
 	<div>
-		<center>
-		</center>
+		<input type=file id="loadDataFileName" style="display:none;" onchange="dataFileNameUpdated();">
 	</div>
 
 	</form>
 
+	<hr>
 	<div id="assignmentsWrapper">
 		<div id="unassigned">
 			<center>
@@ -1011,6 +1110,12 @@ Step 7.<br>
 If you mess up, don't worry... Oh wait, Undo is not implemented, so do worry...  
 Or Save your settings. 
 This will save to a local file that you will need to find later if you want to Load it.
+<br><br>
+Zoom Room Template<br>
+Add extra Zoom breakout rooms that won't have anyone explicitly assigned. 
+Download the Zoom room template to create your breakout rooms automatically. 
+Details on how to load the template can be found on Zooms site: 
+<a href="https://support.zoom.us/hc/en-us/articles/360032752671-Pre-assigning-participants-to-breakout-rooms" target="_blank">Pre-assigning participants to breakout rooms</a>
 			</p>
 		</div>
 	</div>
