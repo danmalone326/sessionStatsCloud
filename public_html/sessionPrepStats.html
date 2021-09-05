@@ -11,6 +11,7 @@ var jsonURL = "https://glaarglookup.n1cck.com/websiteStatsDetail"
 var inputID = "veInput";
 var veCountID = "veCount";
 var roomCountID = "roomCount";
+var examRoomLabelID = "examRoomLabel";
 var showSessionsID = "showSessions";
 var veDataListID = "veDataList";
 var participatingCountID = "participatingCount";
@@ -26,7 +27,7 @@ var assignmentsID = "assignments";
 var unassignedID = "unassigned";
 var unassignedTableID = "unassignedTable";
 
-var standardRoomPrefix = "Room ";
+var examRoomLabel = "Exam ";
 
 // These variables are saved 
 window.participatingVEs = [];
@@ -91,7 +92,7 @@ function findVEinStats(veID) {
 }
 
 function standardRoomName(i) {
-	return standardRoomPrefix + i;
+	return examRoomLabel + i;
 }
 
 function isStandardRoomName(name) {
@@ -301,7 +302,7 @@ function updateRoomArray() {
 	// First remove any extra rooms
 	for (let room in window.roomAssignments) {
 		if ((window.specialRooms.includes(room)) ||
-			 (room.startsWith(standardRoomPrefix) && (room.substr(standardRoomPrefix.length) <= roomCount))) {
+			 (room.startsWith(examRoomLabel) && (room.substr(examRoomLabel.length) <= roomCount))) {
 			continue;
 		} else {
 			delete window.roomAssignments[room];
@@ -326,8 +327,26 @@ function updateRoomArray() {
 function roomCountUpdated() {
 	updateRoomArray();
 	redrawAssignments();
-	// updateRoomDataList();
-	// checkAssignmentsAndRedraw();
+}
+
+// if the exam room label changes, we need to update all the existing rooms
+function examRoomLabelUpdated() {
+	var newExamRoomLabel = document.getElementById(examRoomLabelID).value;
+	if (newExamRoomLabel != examRoomLabel) {
+		var roomCount = Number(document.getElementById(roomCountID).value);
+		for (let roomNum = 1; roomNum <= roomCount; roomNum++) {
+			roomName = standardRoomName(roomNum);
+			newRoomName = newExamRoomLabel + roomNum;
+			roomAssignments[newRoomName] = roomAssignments[roomName];
+			delete roomAssignments[roomName];
+		}
+		examRoomLabel = newExamRoomLabel;
+		redrawAssignments();
+	}
+}
+
+function displayExamRoomLabel() {
+	document.getElementById(examRoomLabelID).value = examRoomLabel;
 }
 
 function showSessionCountUpdated() {
@@ -663,6 +682,7 @@ function saveData() {
 	var data = {"version": 2.0,
 				"sessionID": document.getElementById(sessionID).value,
 				"roomCount": document.getElementById(roomCountID).value,
+				"examRoomLabel": examRoomLabel,
 				"showSessions": document.getElementById(showSessionsID).checked,
 				"specialRooms": window.specialRooms,
 				"participatingVEs": window.participatingVEs,
@@ -723,6 +743,13 @@ function dataFileNameUpdated () {
 					displayExtraZoomRoomsList();
 				}
 
+				if ("examRoomLabel" in data) {
+					examRoomLabel = data.examRoomLabel;
+				} else {
+					examRoomLabel = "Room "; // needed to support old save files
+				}
+				displayExamRoomLabel();
+				
 				refreshParticipatingVEsData();
 				displaySpecialRoomList();
 				updateParticipatingVEsCount();
@@ -763,6 +790,7 @@ function onLoad() {
 	checkDisplayWarning(); 
 	displaySpecialRoomList();
 	displayExtraZoomRoomsList();
+	displayExamRoomLabel();
 	updateRoomArray();
 	updateParticipatingVEsCount();
 	redrawAssignments();
@@ -980,6 +1008,8 @@ td {
 			Session: <input id=sessionID size=10/>
 			<p>
 			Exam Rooms: <input type=number id=roomCount value=4 min=1 max=20 onchange="roomCountUpdated();"/>
+			<p>
+			Exam Room Label: <input id="examRoomLabel" size=10 onchange="examRoomLabelUpdated();"/>
 			<p>
 			<input type=checkbox id=showSessions checked onchange="showSessionCountUpdated();"> Show session count next to VEs
 			<p>
