@@ -69,7 +69,12 @@ function updateProgress() {
 	}
 }
 
+function clearJSONRequests() {
+	jsonRequestQueue = [];
+}
+
 function addJSONRequest(url,index,name) {
+	window.sessionData.applicants[index].data[pendingKey]++;
 	jsonRequestQueue.push({"url": url, "index": index, "name": name});
 	updateProgress();
 }
@@ -92,22 +97,18 @@ function getJSON(url, index, name, callback) {
 		}
 	};
 	xhr.send();
-	
-	// special check to let me use this same function for single lookups.
-	if(index && (index<1000)) {
-		window.sessionData.applicants[index].data[pendingKey]++;
-	}
 };
 
 function jsonCallback(err, data, index, name) {
 	var result = {};
+
 	if (err !== null) {
 		console.log('Something is odd: ' + err + ", index: " + index + ", name: " + name);
 	} else {
 		result = data;
 		window.sessionData.applicants[index].data[name] = result;
 	}
-	if (--window.sessionData.applicants[index].data[pendingKey] == 0) {
+	if (--window.sessionData.applicants[index].data[pendingKey] <= 0) {
 		outputApplicantData(index);
 	}
 
@@ -135,7 +136,7 @@ function loadApplicantData(index) {
 		if (applicationData.callsign) {
 			jsonURL += "&callsign=" + applicationData.callsign;
 		}
-	
+		
 		addJSONRequest(jsonURL, index, ulsDataKey);
 	}
 
@@ -143,7 +144,6 @@ function loadApplicantData(index) {
 		jsonURL = etApplicantLookupURLPrefix + applicationData.callsign;
 		addJSONRequest(jsonURL, index, etDataKey);
 	}
-	doNextJSONRequest();
 }
 
 function compareETDataHTML(attributeName,applicationValue,fccValue) {
@@ -368,6 +368,8 @@ function outputApplicants() {
 	var frnDupe = false;
 	var htmlOutput = "";
 
+	clearJSONRequests();
+
 	htmlOutput += "<center>";
 	htmlOutput += "<hr>";
 
@@ -399,6 +401,9 @@ function outputApplicants() {
 	htmlOutput += "</center>";
 
 	document.getElementById(outputID).innerHTML = htmlOutput;
+	
+	// templates loaded for applicants, now start fetching the data
+	doNextJSONRequest();
 }
 
 //loadDataFileName
