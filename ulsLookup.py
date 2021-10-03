@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-import cgi, cgitb
+import cgi, cgitb, os, re
 import urllib.request
 import json
 
@@ -30,16 +30,23 @@ def addLicenses(data,searchValue):
     if (newData["status"] == "OK"):
         addUniqueEntries(data,newData)
 
-form = cgi.FieldStorage() 
-frn = form.getfirst('frn')
-callsign = form.getfirst('callsign')
+referer = os.getenv("HTTP_REFERER", "")
+result = re.search(r"^(https?:\/\/(?:.+\.)?malone\.org(?::\d{1,5})?)",referer)
 
-if (callsign and callsign.isalnum() and (len(callsign) <= 6)):
-    addLicenses(data,callsign)
+if (result and (len(result.groups()) == 1)):
+    corsValue = result.groups()[0]
 
-if (frn and frn.isdecimal() and (len(frn) == 10)):
-    addLicenses(data,frn)
+    form = cgi.FieldStorage() 
+    frn = form.getfirst('frn')
+    callsign = form.getfirst('callsign')
 
+    if (callsign and callsign.isalnum() and (len(callsign) <= 6)):
+        addLicenses(data,callsign)
+
+    if (frn and frn.isdecimal() and (len(frn) == 10)):
+        addLicenses(data,frn)
+else: 
+    corsValue = None
 
 # byCallsignData = getULS("0004610507")
 # byCallsignData = json.loads('{"status":"OK","Licenses":{"page":"1","rowPerPage":"100","totalRows":"1","lastUpdate":"Aug 17, 2021","License":[{"licName":"MALONE JR, DANIEL J","frn":"0004610507","callsign":"AK6DM","categoryDesc":"Personal Use","serviceDesc":"Vanity","statusDesc":"Active","expiredDate":"11/06/2030","licenseID":"4351155","licDetailURL":"http://wireless2.fcc.gov/UlsApp/UlsSearch/license.jsp?__newWindow=false&licKey=4351155"}]}}')
@@ -52,7 +59,10 @@ if (frn and frn.isdecimal() and (len(frn) == 10)):
 #     addUniqueEntries(data,byFrnData)
 
 
+
 print("Content-type: application/json")
+if (corsValue):
+    print("Access-Control-Allow-Origin: " + corsValue)
 print("")
 
 print(json.JSONEncoder().encode(data))
