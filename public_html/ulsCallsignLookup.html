@@ -166,6 +166,7 @@ function ulsCheckHTML(index) {
 	var dataClass = "";
 	var htmlOutput = "";
 	var applicationData = mainData['people'][index];
+	var callsign = applicationData['callsign'].toUpperCase();
 
 	if (ulsDataKey in applicationData.data) {
 
@@ -187,23 +188,25 @@ function ulsCheckHTML(index) {
 			htmlOutput += "</tr>";
 
 			applicationData.data[ulsDataKey].forEach(function (item, index) {
-				item.licDetailURL = item.licDetailURL.replace("http://","https://");
-				htmlOutput += "<tr>";
+				if (callsign == item.callsign) {
+					item.licDetailURL = item.licDetailURL.replace("http://","https://");
+					htmlOutput += "<tr>";
 
-				htmlOutput += "<td>" + item.frn + "</td>";
-				htmlOutput += "<td>" + item.callsign + "</td>";
-				htmlOutput += "<td>" + item.statusDesc + "</td>";
+					htmlOutput += "<td>" + item.frn + "</td>";
+					htmlOutput += "<td>" + item.callsign + "</td>";
+					htmlOutput += "<td>" + item.statusDesc + "</td>";
 
-				var formID = coresFormPrefix + "-" + applicationData.pin + "-" + item.licenseID;
-				htmlOutput += "<td>";
-				htmlOutput += "<form id='" + formID + 
-								"' target='" + coresPopupTarget + 
-								"' action='" + item.licDetailURL + 
-								"' method='POST' >";
-				htmlOutput += "<button onclick='coresPopup(\"" + formID + "\")'>Open ULS Entry</button>";
-				htmlOutput += "</td>";
-				htmlOutput += "</form>";
-				htmlOutput += "</tr>";
+					var formID = coresFormPrefix + "-" + applicationData.pin + "-" + item.licenseID;
+					htmlOutput += "<td>";
+					htmlOutput += "<form id='" + formID + 
+									"' target='" + coresPopupTarget + 
+									"' action='" + item.licDetailURL + 
+									"' method='POST' >";
+					htmlOutput += "<button onclick='coresPopup(\"" + formID + "\")'>Open ULS Entry</button>";
+					htmlOutput += "</td>";
+					htmlOutput += "</form>";
+					htmlOutput += "</tr>";
+				}
 			});
 
 			htmlOutput += "</table>"
