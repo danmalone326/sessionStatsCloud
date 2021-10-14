@@ -1,15 +1,38 @@
 #!/usr/bin/python3
-import cgi, cgitb, os, re
+import cgi, cgitb, os, re, sys
 import urllib.request
 import json
+
+debug = False
+debugCLI = False
 
 ulsSearchUrlPrefix = "https://data.fcc.gov/api/license-view/basicSearch/getLicenses?sortColumn=expiredDate&format=json&searchValue="
 
 data = []
 
 def getULS(searchValue):
-    with urllib.request.urlopen(ulsSearchUrlPrefix+searchValue) as url:
-        ulsData = json.loads(url.read().decode())
+    first = True
+    pageNum = 1
+    ulsData = {}
+    tempData = {}
+
+    try:
+        while (first or (len(ulsData["Licenses"]["License"]) < int(ulsData["Licenses"]["totalRows"]))): 
+            searchURL = ulsSearchUrlPrefix+searchValue+"&pageNum="+str(pageNum)
+            with urllib.request.urlopen(searchURL) as url:
+                tempData = json.loads(url.read().decode())
+            if (first):
+                ulsData = tempData
+                first = False
+            else:
+                ulsData["Licenses"]["License"].extend(tempData["Licenses"]["License"])
+            pageNum += 1
+            if (pageNum > 8):
+                break
+    except Exception as e:
+        print(str(e))
+        print(ulsData)
+    
     return ulsData
 
 def licenseExists(data,licenseID):
@@ -30,21 +53,50 @@ def addLicenses(data,searchValue):
     if (newData["status"] == "OK"):
         addUniqueEntries(data,newData)
 
+def filterEntries(data,callsign,frn):
+    newData = []
+    for license in data:
+        if ((callsign and license["callsign"] == callsign) or (frn and license["frn"] == frn)):
+            newData.append(license)
+    return newData
+
+
+if (debug): 
+    print("Content-type: text/plain")
+    print("")
+    corsValue = None
+ 
 referer = os.getenv("HTTP_REFERER", "")
 result = re.search(r"^(https?:\/\/(?:.+\.)?malone\.org(?::\d{1,5})?)",referer)
 
-if (result and (len(result.groups()) == 1)):
-    corsValue = result.groups()[0]
+if (debug or (result and (len(result.groups()) == 1))):
+    if (result):
+        corsValue = result.groups()[0]
 
-    form = cgi.FieldStorage() 
-    frn = form.getfirst('frn')
-    callsign = form.getfirst('callsign')
+    if (debugCLI):
+        if (len(sys.argv) >= 2):
+            callsign = sys.argv[1].upper()
+        else:
+            callsign = None
 
-    if (callsign and callsign.isalnum() and (len(callsign) <= 6)):
+        if (len(sys.argv) >= 3):
+            frn = sys.argv[2]
+        else:
+            frn = None
+    else:
+        form = cgi.FieldStorage() 
+        frn = form.getfirst('frn')
+        callsign = form.getfirst('callsign')
+
+# /^[A-Z]{1,2}\d[A-Z]{1,3}$/   re.search(r"^[A-Z]{1,2}\d[A-Z]{1,3}$",callsign)
+    if (callsign and re.search(r"^[A-Za-z]{1,2}\d[A-Za-z]{1,3}$",callsign)):
         addLicenses(data,callsign)
 
     if (frn and frn.isdecimal() and (len(frn) == 10)):
         addLicenses(data,frn)
+
+    data = filterEntries(data,callsign,frn)
+
 else: 
     corsValue = None
 
