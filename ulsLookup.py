@@ -30,8 +30,9 @@ def getULS(searchValue):
             if (pageNum > 8):
                 break
     except Exception as e:
-        print(str(e))
-        print(ulsData)
+        if (debug):
+            print(str(e))
+            print(ulsData)
     
     return ulsData
 
