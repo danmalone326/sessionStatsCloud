@@ -40,6 +40,14 @@ var matchValueClass = "matchValue";
 var similarValueClass = "similarValue";
 var differentValueClass = "differentValue";
 
+// states plus DC, American Samoa, Guam, Mariana Islands, Puerto Rico, and US Virgin Islands
+// not including APO/FPO 
+var states = ["AL", "AK", "AS", "AZ", "AR", "CA", "CO", "CT", "DC", "DE", "FL", "GA", 
+              "GU", "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD", 
+              "MA", "MI", "MN", "MP", "MS", "MO", "MT", "NE", "NV", "NH", "NJ", 
+              "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "PR", "RI", "SC", 
+              "SD", "TN", "TX", "UT", "VT", "VA", "VI", "WA", "WV", "WI", "WY"]
+
 function checkDisplayWarning() {
 // 	console.log(document.location.href.includes('glaarg-test'));
 	if (document.location.href.includes('glaarg-test')) {
@@ -144,6 +152,99 @@ function loadApplicantData(index) {
 		jsonURL = etApplicantLookupURLPrefix + applicationData.callsign;
 		addJSONRequest(jsonURL, index, etDataKey);
 	}
+}
+
+function initCaps(s) {
+	var words = s.split(" ");
+
+	for (let i = 0; i < words.length; i++) {
+		words[i] = words[i][0].toUpperCase() + words[i].substr(1);
+	}
+
+	return words.join(" ");
+}
+
+function markIfNotInitCaps(s) {
+	var htmlOutput = "";
+	var mark = false;
+	if (s != initCaps(s)) {
+		mark = true;
+	}
+	if (mark) {
+		htmlOutput += "<mark>"
+	}
+	htmlOutput += s;
+	if (mark) {
+		htmlOutput += "</mark>"
+	}
+
+	return htmlOutput;
+}
+
+function markIfNotState(s) {
+	var htmlOutput = "";
+	var mark = false;
+	if (!(states.includes(s))) {
+		mark = true;
+	}
+	if (mark) {
+		htmlOutput += "<mark>"
+	}
+	htmlOutput += s;
+	if (mark) {
+		htmlOutput += "</mark>"
+	}
+
+	return htmlOutput;
+}
+
+function markIfNotZip(s) {
+	var htmlOutput = "";
+	var mark = false;
+	const regex = /^\d{5}((-)?\d{4})?$/; 
+	if (!(regex.test(s))) {
+		mark = true;
+	}
+	if (mark) {
+		htmlOutput += "<mark>"
+	}
+	htmlOutput += s;
+	if (mark) {
+		htmlOutput += "</mark>"
+	}
+
+	return htmlOutput;
+
+}
+
+function nameAddressSimpleCheck(index) {
+	var htmlOutput = "";
+	var applicationData = window.sessionData.applicants[index];
+	var mark = false;
+
+	htmlOutput += "<h3>Initial Name and Address Checks</h3>";
+	htmlOutput += "<table><tr><td>";
+		htmlOutput += markIfNotInitCaps(applicationData.firstname);
+		htmlOutput += " ";
+		if (applicationData.middle) {
+			htmlOutput += markIfNotInitCaps(applicationData.middle);
+			htmlOutput += " ";
+		}
+		htmlOutput += markIfNotInitCaps(applicationData.lastname);
+		htmlOutput += " ";
+
+		htmlOutput += (applicationData.suffix ? " " + applicationData.suffix : "");
+		htmlOutput += "<br>";
+
+		htmlOutput += applicationData.addr;
+		htmlOutput += "<br>";
+		htmlOutput += applicationData.city + ", ";
+		htmlOutput += markIfNotState(applicationData.state) + " ";
+		htmlOutput += markIfNotZip(applicationData.zip);
+		htmlOutput += "<br>";
+	htmlOutput += "</td></tr></table>";
+
+	return htmlOutput;
 }
 
 function compareETDataHTML(attributeName,applicationValue,fccValue) {
@@ -356,6 +457,7 @@ function outputApplicantData(index) {
 	var htmlOutput = "";
 	var applicant = window.sessionData.applicants[index];
 
+	htmlOutput += nameAddressSimpleCheck(index);
 	htmlOutput += whatETSeesHTML(index);
 	htmlOutput += ulsCheckHTML(index);
 	htmlOutput += coresCheckHTML(index);
