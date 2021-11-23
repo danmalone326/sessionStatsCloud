@@ -154,6 +154,52 @@ function loadApplicantData(index) {
 	}
 }
 
+function duplicateFirstLastName(thisIndex) {
+	var thisApplicationData = window.sessionData.applicants[thisIndex];
+	var matches = [];
+
+	window.sessionData.applicants.forEach(function (item, loopIndex) {
+		if (loopIndex != thisIndex) {
+			if ((thisApplicationData.firstname.toUpperCase() == item.firstname.toUpperCase()) &&
+				(thisApplicationData.lastname.toUpperCase() == item.lastname.toUpperCase())) {
+				matches.push(item.pin);
+			}
+		}
+	});
+
+	return matches;
+}
+
+function duplicateLastName(thisIndex) {
+	var thisApplicationData = window.sessionData.applicants[thisIndex];
+	var matches = [];
+
+	window.sessionData.applicants.forEach(function (item, loopIndex) {
+		if (loopIndex != thisIndex) {
+			if (thisApplicationData.lastname.toUpperCase() == item.lastname.toUpperCase()) {
+				matches.push(item.pin);
+			}
+		}
+	});
+
+	return matches;
+}
+
+function duplicateAddress(thisIndex) {
+	var thisApplicationData = window.sessionData.applicants[thisIndex];
+	var matches = [];
+
+	window.sessionData.applicants.forEach(function (item, loopIndex) {
+		if (loopIndex != thisIndex) {
+			if (thisApplicationData.addr.toUpperCase() == item.addr.toUpperCase()) {
+				matches.push(item.pin);
+			}
+		}
+	});
+
+	return matches;
+}
+
 function initCaps(s) {
 	var words = s.split(" ");
 
@@ -224,6 +270,33 @@ function nameAddressSimpleCheck(index) {
 
 	htmlOutput += "<h3>Initial Name and Address Checks</h3>";
 	htmlOutput += "<table><tr><td>";
+		matches = duplicateFirstLastName(index);
+		if (!(matches.length === 0)) {
+			htmlOutput += "<mark>";
+			htmlOutput += "First and Last name match with PIN(s): ";
+			htmlOutput += matches.join(",");
+			htmlOutput += "</mark>";
+			htmlOutput += "<br>";
+		}
+
+		matches = duplicateLastName(index);
+		if (!(matches.length === 0)) {
+			htmlOutput += "<mark>"
+			htmlOutput += "Last name match with PIN(s): ";
+			htmlOutput += matches.join(",");
+			htmlOutput += "</mark>";
+			htmlOutput += "<br>";
+		}
+
+		matches = duplicateAddress(index);
+		if (!(matches.length === 0)) {
+			htmlOutput += "<mark>"
+			htmlOutput += "Address match with PIN(s): ";
+			htmlOutput += matches.join(",");
+			htmlOutput += "</mark>";
+			htmlOutput += "<br>";
+		}
+
 		htmlOutput += markIfNotInitCaps(applicationData.firstname);
 		htmlOutput += " ";
 		if (applicationData.middle) {
