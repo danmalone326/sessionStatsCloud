@@ -51,7 +51,8 @@ def addUniqueEntries(data,newData):
 
 def addLicenses(data,searchValue):
     newData = getULS(searchValue)
-    if (newData["status"] == "OK"):
+    # ignoring errors for now, but here's where to deal with them if needed
+    if (("status" in newData) and (newData["status"] == "OK")):
         addUniqueEntries(data,newData)
 
 def filterEntries(data,callsign,frn):
