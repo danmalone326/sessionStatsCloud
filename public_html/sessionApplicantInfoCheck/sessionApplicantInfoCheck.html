@@ -6,6 +6,9 @@
 <link rel="apple-touch-icon" href="https://glaarg.org/wp-content/uploads/2018/05/cropped-glaarglogoyellowblack-180x180.jpg" />
 
 <script>
+
+var debugSkipLookup = false;
+
 // https://exam.tools/api/uls/lookup/$callsign
 // https://exam.tools/api/uls/lookup/$frn
 // https://apps.fcc.gov/coresWeb/simpleSearch.do
@@ -139,7 +142,7 @@ function loadApplicantData(index) {
 	window.sessionData.applicants[index].data = {};
 	window.sessionData.applicants[index].data[pendingKey] = 0;
 
-	if ((applicationData.callsign) || (applicationData.frn)) {
+	if (((applicationData.callsign) || (applicationData.frn)) && (!debugSkipLookup)) {
 		jsonURL = licenseSearchURLPrefix + "frn=" + applicationData.frn;
 		if (applicationData.callsign) {
 			jsonURL += "&callsign=" + applicationData.callsign;
@@ -154,14 +157,20 @@ function loadApplicantData(index) {
 	}
 }
 
+// function to normalize values for comparison
+// upper case and removes everything but letters and numbers 
+function compareNormalize(value) {
+	return value.toUpperCase().replace(/[^A-Z0-9]+/g,'') 
+}
+
 function duplicateFirstLastName(thisIndex) {
 	var thisApplicationData = window.sessionData.applicants[thisIndex];
 	var matches = [];
 
 	window.sessionData.applicants.forEach(function (item, loopIndex) {
 		if (loopIndex != thisIndex) {
-			if ((thisApplicationData.firstname.toUpperCase() == item.firstname.toUpperCase()) &&
-				(thisApplicationData.lastname.toUpperCase() == item.lastname.toUpperCase())) {
+			if ((compareNormalize(thisApplicationData.firstname) == compareNormalize(item.firstname)) &&
+				(compareNormalize(thisApplicationData.lastname) == compareNormalize(item.lastname))) {
 				matches.push(item.pin);
 			}
 		}
@@ -176,7 +185,7 @@ function duplicateLastName(thisIndex) {
 
 	window.sessionData.applicants.forEach(function (item, loopIndex) {
 		if (loopIndex != thisIndex) {
-			if (thisApplicationData.lastname.toUpperCase() == item.lastname.toUpperCase()) {
+			if (compareNormalize(thisApplicationData.lastname) == compareNormalize(item.lastname)) {
 				matches.push(item.pin);
 			}
 		}
@@ -191,7 +200,7 @@ function duplicateAddress(thisIndex) {
 
 	window.sessionData.applicants.forEach(function (item, loopIndex) {
 		if (loopIndex != thisIndex) {
-			if (thisApplicationData.addr.toUpperCase() == item.addr.toUpperCase()) {
+			if (compareNormalize(thisApplicationData.addr) == compareNormalize(item.addr)) {
 				matches.push(item.pin);
 			}
 		}
