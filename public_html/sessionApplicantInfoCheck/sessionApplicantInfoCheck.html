@@ -60,6 +60,7 @@ function checkDisplayWarning() {
 
 var progressDivID = "progress";
 var jsonRequestQueue = [];
+var waitingForJSONCallback = false;
 
 function updateProgress() {
 	var htmlOutput = "";
@@ -88,6 +89,7 @@ function addJSONRequest(url,index,name) {
 	window.sessionData.applicants[index].data[pendingKey]++;
 	jsonRequestQueue.push({"url": url, "index": index, "name": name});
 	updateProgress();
+	doNextJSONRequest();
 }
 
 function getNextJSONRequest() {
@@ -97,9 +99,11 @@ function getNextJSONRequest() {
 // Routines for loading JSON results
 function getJSON(url, index, name, callback) {
 	var xhr = new XMLHttpRequest();
+	waitingForJSONCallback = true;
 	xhr.open('GET', url, true);
 	xhr.responseType = 'json';
 	xhr.onload = function() {
+		waitingForJSONCallback = false;
 		var status = xhr.status;
 		if (status === 200) {
 			callback(null, xhr.response, index, name);
@@ -128,19 +132,19 @@ function jsonCallback(err, data, index, name) {
 };
 
 function doNextJSONRequest() {
-	var request = getNextJSONRequest();
+	if (!waitingForJSONCallback) {
+		var request = getNextJSONRequest();
 
-	if (request) {
-		getJSON(request.url, request.index, request.name, jsonCallback);
+		if (request) {
+			getJSON(request.url, request.index, request.name, jsonCallback);
+		}
 	}
 }
 
-function loadApplicantData(index) {
+function loadUlsData(index) {
 	var jsonURL;
-	var name;
 	var applicationData = window.sessionData.applicants[index];
-	window.sessionData.applicants[index].data = {};
-	window.sessionData.applicants[index].data[pendingKey] = 0;
+	delete applicationData.data[ulsDataKey];
 
 	if (((applicationData.callsign) || (applicationData.frn)) && (!debugSkipLookup)) {
 		jsonURL = licenseSearchURLPrefix + "frn=" + applicationData.frn;
@@ -150,11 +154,33 @@ function loadApplicantData(index) {
 		
 		addJSONRequest(jsonURL, index, ulsDataKey);
 	}
+}
+
+function loadEtData(index) {
+	var jsonURL;
+	var applicationData = window.sessionData.applicants[index];
+	delete applicationData.data[etDataKey];
 
 	if (applicationData.callsign) {
 		jsonURL = etApplicantLookupURLPrefix + applicationData.callsign;
 		addJSONRequest(jsonURL, index, etDataKey);
 	}
+}
+
+function loadApplicantData(index) {
+	var jsonURL;
+	var applicationData = window.sessionData.applicants[index];
+	applicationData.data = {};
+	applicationData.data[pendingKey] = 0;
+
+	loadUlsData(index);
+	loadEtData(index);
+}
+
+function retryUls(index) {
+	loadUlsData(index);
+	var divID = applicantCheckIDPrefix + index;
+	document.getElementById(divID).innerHTML = "Retrying...";
 }
 
 // function to normalize values for comparison
@@ -397,17 +423,21 @@ function whatETSeesHTML(index) {
 // sort by expiredDate desc, statusDesc
 function ulsDataSort(a,b) {
 	var result = 0;
-	var sortA = a.expiredDate.substring(6,10) + a.expiredDate.substring(0,2) + a.expiredDate.substring(3,5);
-	var sortB = b.expiredDate.substring(6,10) + b.expiredDate.substring(0,2) + b.expiredDate.substring(3,5);
-	if (expA > expB) {
-		result = -1;
-	} else if (expA < expB) {
-		result = 1;
+	if (("status" in a) || (("status" in b) && (!("status" in a)))) {
+		result = 1
 	} else {
-		if (a.statusDesc < b.statusDesc) {
+		var sortA = a.expiredDate.substring(6,10) + a.expiredDate.substring(0,2) + a.expiredDate.substring(3,5);
+		var sortB = b.expiredDate.substring(6,10) + b.expiredDate.substring(0,2) + b.expiredDate.substring(3,5);
+		if (expA > expB) {
 			result = -1;
-		} else if (a.statusDesc > b.statusDesc) {
+		} else if (expA < expB) {
 			result = 1;
+		} else {
+			if (a.statusDesc < b.statusDesc) {
+				result = -1;
+			} else if (a.statusDesc > b.statusDesc) {
+				result = 1;
+			}
 		}
 	}
 
@@ -448,33 +478,47 @@ function ulsCheckHTML(index) {
 			htmlOutput += "<th></th>";
 			htmlOutput += "</tr>";
 
-			applicationData.data[ulsDataKey].forEach(function (item, index) {
-				item.licDetailURL = item.licDetailURL.replace("http://","https://");
+			applicationData.data[ulsDataKey].forEach(function (item, index2) {
 				htmlOutput += "<tr>";
+				
+				if ("Errors" in item) {
+					htmlOutput += "<td>Error:</td>";
+					htmlOutput += "<td colspan=3>";
+					try {
+						htmlOutput += item.Errors.Err[0].msg;
+					} catch(e) {
+						htmlOutput += "unknown"
+					}
+					htmlOutput += " <button onClick='retryUls(" + index + ")'>Retry</button>";
+					htmlOutput += "</td>";
 
-				dataClass = matchValueClass;
-				if (item.frn !== applicationData.frn){
-					dataClass = differentValueClass;
+				} else {  // a license
+					item.licDetailURL = item.licDetailURL.replace("http://","https://");
+					dataClass = matchValueClass;
+					if (item.frn !== applicationData.frn){
+						dataClass = differentValueClass;
+					}
+					htmlOutput += "<td class='" + dataClass + "'>" + item.frn + "</td>";
+
+					dataClass = matchValueClass;
+					if (item.callsign !== applicationData.callsign) {
+						dataClass = differentValueClass;
+					}
+					htmlOutput += "<td class='" + dataClass + "'>" + item.callsign + "</td>";
+
+					htmlOutput += "<td>" + item.statusDesc + "</td>";
+
+					var formID = coresFormPrefix + "-" + applicationData.pin + "-" + item.licenseID;
+					htmlOutput += "<td>";
+					htmlOutput += "<form id='" + formID + 
+									"' target='" + coresPopupTarget + 
+									"' action='" + item.licDetailURL + 
+									"' method='POST' >";
+					htmlOutput += "<button onclick='coresPopup(\"" + formID + "\")'>Open ULS Entry</button>";
+					htmlOutput += "</td>";
+					htmlOutput += "</form>";
 				}
-				htmlOutput += "<td class='" + dataClass + "'>" + item.frn + "</td>";
 
-				dataClass = matchValueClass;
-				if (item.callsign !== applicationData.callsign) {
-					dataClass = differentValueClass;
-				}
-				htmlOutput += "<td class='" + dataClass + "'>" + item.callsign + "</td>";
-
-				htmlOutput += "<td>" + item.statusDesc + "</td>";
-
-				var formID = coresFormPrefix + "-" + applicationData.pin + "-" + item.licenseID;
-				htmlOutput += "<td>";
-				htmlOutput += "<form id='" + formID + 
-								"' target='" + coresPopupTarget + 
-								"' action='" + item.licDetailURL + 
-								"' method='POST' >";
-				htmlOutput += "<button onclick='coresPopup(\"" + formID + "\")'>Open ULS Entry</button>";
-				htmlOutput += "</td>";
-				htmlOutput += "</form>";
 				htmlOutput += "</tr>";
 			});
 
@@ -586,9 +630,6 @@ function outputApplicants() {
 	htmlOutput += "</center>";
 
 	document.getElementById(outputID).innerHTML = htmlOutput;
-	
-	// templates loaded for applicants, now start fetching the data
-	doNextJSONRequest();
 }
 
 //loadDataFileName

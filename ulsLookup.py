@@ -39,7 +39,7 @@ def getULS(searchValue):
 def licenseExists(data,licenseID):
     exists = False
     for license in data:
-        if (license["licenseID"] == licenseID):
+        if (("licenseID" in license) and (license["licenseID"] == licenseID)):
             exists = True
             break
     return exists
@@ -49,16 +49,22 @@ def addUniqueEntries(data,newData):
         if (((license["serviceDesc"] == "Amateur") or (license["serviceDesc"] == "Vanity")) and (not licenseExists(data,license["licenseID"]))):
             data.append(license)
 
+def addError(data,newData):
+    data.append(newData)
+
 def addLicenses(data,searchValue):
     newData = getULS(searchValue)
     # ignoring errors for now, but here's where to deal with them if needed
-    if (("status" in newData) and (newData["status"] == "OK")):
-        addUniqueEntries(data,newData)
+    if ("status" in newData):
+        if (newData["status"] == "OK"):
+            addUniqueEntries(data,newData)
+    else:
+        addError(data,newData)
 
 def filterEntries(data,callsign,frn):
     newData = []
     for license in data:
-        if ((callsign and license["callsign"] == callsign) or (frn and license["frn"] == frn)):
+        if (("Errors" in license) or (callsign and license["callsign"] == callsign) or (frn and license["frn"] == frn)):
             newData.append(license)
     return newData
 
