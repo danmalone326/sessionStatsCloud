@@ -423,7 +423,7 @@ function whatETSeesHTML(index) {
 // sort by expiredDate desc, statusDesc
 function ulsDataSort(a,b) {
 	var result = 0;
-	if (("status" in a) || (("status" in b) && (!("status" in a)))) {
+	if ((!("expiredDate" in a)) || ((!("expiredDate" in b)) && ("expiredDate" in a))) {
 		result = 1
 	} else {
 		var sortA = a.expiredDate.substring(6,10) + a.expiredDate.substring(0,2) + a.expiredDate.substring(3,5);
