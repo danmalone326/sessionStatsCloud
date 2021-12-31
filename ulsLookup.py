@@ -2,6 +2,8 @@
 import cgi, cgitb, os, re, sys
 import urllib.request
 import json
+import sqlite3
+import time
 
 debug = False
 debugCLI = False
@@ -10,7 +12,111 @@ ulsSearchUrlPrefix = "https://data.fcc.gov/api/license-view/basicSearch/getLicen
 
 data = []
 
-def getULS(searchValue):
+### TEST AND PROD SHARE A CACHE
+cacheDbPath = "../../data/ulsCache.db"
+cacheDbTableName = "ulsSearchResults"
+cacheDbTableDefinition = "{}(KEY TEXT NOT NULL PRIMARY KEY, TIMESTAMP INTEGER, JSON TEXT)".format(cacheDbTableName)
+cacheDb = None
+
+refreshCacheTime = 86400  # 86400 = 1 day in seconds
+maxCacheTime = 604800     # 604800 = 1 week in seconds
+maxCacheSize = 1000       # max 1000 entries
+
+# openCache
+def openCache():
+    global cacheDb
+    # connect to database with autocommit
+    cacheDb = sqlite3.connect(cacheDbPath, isolation_level=None)
+
+    # see if our table exists
+    cur = cacheDb.cursor()
+    result = cur.execute("SELECT tbl_name FROM sqlite_master WHERE type='table' AND tbl_name=?;", [cacheDbTableName]).fetchall()
+    if (len(result) == 0):
+        cur.execute("CREATE TABLE {};".format(cacheDbTableDefinition))
+        # print('table created')
+    else:
+        pass
+        clearExpiredCache()   # Not the greatest to do this every time
+
+# getCache
+def getCache(key):
+    global cacheDb
+    selectString = "SELECT * FROM {} WHERE KEY=?;".format(cacheDbTableName)
+    cur = cacheDb.cursor()
+    queryResult = cur.execute(selectString, [key]).fetchall()
+    if (len(queryResult) == 1):
+        result = json.loads(queryResult[0][2])
+    else:
+        result = None
+    return result
+
+# cacheExists
+def cacheExists(key):
+    global cacheDb
+    if (getCache(key) is None):
+        result = False
+    else:
+        result = True
+    return result
+
+# updateCache
+def updateCache(key,obj):
+    global cacheDb
+    now = int(time.time())
+    jsonStr = json.dumps(obj)
+
+    cur = cacheDb.cursor()
+    if (cacheExists(key)):
+        updateString = "UPDATE {} SET TIMESTAMP=?,JSON=? WHERE KEY=?;".format(cacheDbTableName)
+        result = cur.execute(updateString,[now,jsonStr,key])
+    else:
+        insertString = "INSERT INTO {}(KEY,TIMESTAMP,JSON) VALUES (?,?,?);".format(cacheDbTableName)
+        result = cur.execute(insertString,[key,now,jsonStr])
+
+def cacheNeedsRefresh(key):
+    global cacheDb
+    now = int(time.time())
+    minTime = now - refreshCacheTime
+    selectString = "SELECT COUNT(*) FROM {} WHERE KEY=? AND TIMESTAMP>?;".format(cacheDbTableName)
+    cur = cacheDb.cursor()
+    queryResult = cur.execute(selectString, [key,minTime]).fetchall()
+    if (queryResult[0][0] == 1):
+        result = False
+    else:
+        result = True
+    return result
+
+# clearExpiredCache
+def clearExpiredCache():
+    global cacheDb
+    now = int(time.time())
+    deleteBeforeTime = now - maxCacheTime
+
+    selectString = "SELECT COUNT(*),MIN(TIMESTAMP) FROM {};".format(cacheDbTableName)
+    cur = cacheDb.cursor()
+    queryResult = cur.execute(selectString).fetchall()
+
+    cacheSize,minTime = queryResult[0]
+    if (minTime is None):
+        minTime = now
+
+    if ((cacheSize > maxCacheSize) or (minTime < deleteBeforeTime)):
+        deleteString = "DELETE FROM {} WHERE KEY NOT IN (SELECT KEY FROM {} WHERE TIMESTAMP > {} ORDER BY TIMESTAMP DESC LIMIT {});".format(cacheDbTableName,cacheDbTableName,deleteBeforeTime,maxCacheSize)
+        deleteResult = cur.execute(deleteString)
+
+    # compact the database
+    cacheDb.execute("VACUUM")
+
+def dumpCache():
+    global cacheDb
+    selectString = "SELECT * FROM {} ORDER BY TIMESTAMP DESC;".format(cacheDbTableName)
+    cur = cacheDb.cursor()
+    queryResult = cur.execute(selectString).fetchall()
+
+    for row in queryResult:
+        print(row)
+
+def queryULS(searchValue):
     first = True
     pageNum = 1
     ulsData = {}
@@ -35,6 +141,30 @@ def getULS(searchValue):
             print(ulsData)
     
     return ulsData
+
+def getULS(searchValue):
+    result = None
+
+    if (cacheNeedsRefresh(searchValue)):
+        if debug:
+            print("cache refresh")
+        ulsResult = queryULS(searchValue)
+        if ("status" in ulsResult):
+            if debug:
+                print("good status, update cache")
+            updateCache(searchValue,ulsResult)
+            result = ulsResult
+        elif (not cacheExists(searchValue)):
+            if debug:
+                print("error but no cache")
+            result = ulsResult
+    
+    if (result is None):
+        if debug:
+            print("no result yet, get cache")
+        result = getCache(searchValue)
+
+    return result
 
 def licenseExists(data,licenseID):
     exists = False
@@ -73,6 +203,8 @@ if (debug):
     print("Content-type: text/plain")
     print("")
     corsValue = None
+
+openCache()
  
 referer = os.getenv("HTTP_REFERER", "")
 result = re.search(r"^(https?:\/\/(?:.+\.)?malone\.org(?::\d{1,5})?)",referer)
