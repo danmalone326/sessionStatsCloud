@@ -452,10 +452,11 @@ function ulsCheckHTML(index) {
 	if (ulsDataKey in applicationData.data) {
 
 		var applicantUlsData = applicationData.data[ulsDataKey];
+		var applicantUlsLicenses = applicantUlsData["licenses"]
 
 		htmlOutput += "<h3>ULS Entries</h3>";
 
-		if (applicantUlsData.length == 0) {
+		if (applicantUlsLicenses.length == 0) {
 			htmlOutput += "No Amateur Licenses found in ULS for this FRN or Callsign.";
 		} else {
 
@@ -478,7 +479,7 @@ function ulsCheckHTML(index) {
 			htmlOutput += "<th></th>";
 			htmlOutput += "</tr>";
 
-			applicationData.data[ulsDataKey].forEach(function (item, index2) {
+			applicantUlsLicenses.forEach(function (item, index2) {
 				htmlOutput += "<tr>";
 				
 				if ("Errors" in item) {
@@ -692,6 +693,8 @@ function searchOne() {
 function displayOne(err, data, frn, callsign) {
 	var htmlOutput = "";
 
+	var licenses = data["licenses"];
+
 	jsonRequestQueue.shift();
 	updateProgress();
 
@@ -707,34 +710,36 @@ function displayOne(err, data, frn, callsign) {
 		htmlOutput += "<th></th>";
 		htmlOutput += "</tr>";
 
-		data.forEach(function (item, index) {
-			item.licDetailURL = item.licDetailURL.replace("http://","https://");
-			htmlOutput += "<tr>";
+		licenses.forEach(function (item, index) {
+			if ("licDetailURL" in item) {
+				item.licDetailURL = item.licDetailURL.replace("http://","https://");
+				htmlOutput += "<tr>";
 
-			dataClass = matchValueClass;
-			if (item.frn !== frn){
-				dataClass = differentValueClass;
+				dataClass = matchValueClass;
+				if (item.frn !== frn){
+					dataClass = differentValueClass;
+				}
+				htmlOutput += "<td class='" + dataClass + "'>" + item.frn + "</td>";
+
+				dataClass = matchValueClass;
+				if (item.callsign !== callsign) {
+					dataClass = differentValueClass;
+				}
+				htmlOutput += "<td class='" + dataClass + "'>" + item.callsign + "</td>";
+
+				htmlOutput += "<td>" + item.statusDesc + "</td>";
+
+				var formID = coresFormPrefix + "-" + item.licenseID;
+				htmlOutput += "<td>";
+				htmlOutput += "<form id='" + formID + 
+								"' target='" + coresPopupTarget + 
+								"' action='" + item.licDetailURL + 
+								"' method='POST' >";
+				htmlOutput += "<button onclick='coresPopup(\"" + formID + "\")'>Open ULS Entry</button>";
+				htmlOutput += "</td>";
+				htmlOutput += "</form>";
+				htmlOutput += "</tr>";
 			}
-			htmlOutput += "<td class='" + dataClass + "'>" + item.frn + "</td>";
-
-			dataClass = matchValueClass;
-			if (item.callsign !== callsign) {
-				dataClass = differentValueClass;
-			}
-			htmlOutput += "<td class='" + dataClass + "'>" + item.callsign + "</td>";
-
-			htmlOutput += "<td>" + item.statusDesc + "</td>";
-
-			var formID = coresFormPrefix + "-" + item.licenseID;
-			htmlOutput += "<td>";
-			htmlOutput += "<form id='" + formID + 
-							"' target='" + coresPopupTarget + 
-							"' action='" + item.licDetailURL + 
-							"' method='POST' >";
-			htmlOutput += "<button onclick='coresPopup(\"" + formID + "\")'>Open ULS Entry</button>";
-			htmlOutput += "</td>";
-			htmlOutput += "</form>";
-			htmlOutput += "</tr>";
 		});
 
 		htmlOutput += "</table>"

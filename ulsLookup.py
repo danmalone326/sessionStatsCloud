@@ -11,6 +11,7 @@ debugCLI = False
 ulsSearchUrlPrefix = "https://data.fcc.gov/api/license-view/basicSearch/getLicenses?sortColumn=expiredDate&format=json&searchValue="
 
 licenses = []
+resultPayload = {}
 
 ### TEST AND PROD SHARE A CACHE
 cacheDbPath = "../../data/ulsCache.db"
@@ -144,6 +145,7 @@ def queryULS(searchValue):
 
 def getULS(searchValue):
     result = None
+    tryAgain = False
 
     if (cacheNeedsRefresh(searchValue)):
         if debug:
@@ -154,17 +156,19 @@ def getULS(searchValue):
                 print("good status, update cache")
             updateCache(searchValue,ulsResult)
             result = ulsResult
-        elif (not cacheExists(searchValue)):
-            if debug:
-                print("error but no cache")
-            result = ulsResult
-    
+        else:
+            tryAgain = True
+            if (not cacheExists(searchValue)):
+                if debug:
+                    print("error but no cache")
+                result = ulsResult
+        
     if (result is None):
         if debug:
             print("no result yet, get cache")
         result = getCache(searchValue)
 
-    return result
+    return result, tryAgain
 
 def licenseExists(licenses,licenseID):
     exists = False
@@ -183,13 +187,15 @@ def addError(licenses,ulsData):
     licenses.append(ulsData)
 
 def addLicenses(licenses,searchValue):
-    ulsData = getULS(searchValue)
+    ulsData, tryAgain = getULS(searchValue)
     # ignoring errors for now, but here's where to deal with them if needed
     if ("status" in ulsData):
         if (ulsData["status"] == "OK"):
             addUniqueEntries(licenses,ulsData)
     else:
         addError(licenses,ulsData)
+    
+    return tryAgain
 
 def filterEntries(licenses,callsign,frn):
     newLicenses = []
@@ -228,14 +234,20 @@ if (debug or (result and (len(result.groups()) == 1))):
         frn = form.getfirst('frn')
         callsign = form.getfirst('callsign')
 
+    tryAgainCallsign = False
+    tryAgainFRN = False
+
 # /^[A-Z]{1,2}\d[A-Z]{1,3}$/   re.search(r"^[A-Z]{1,2}\d[A-Z]{1,3}$",callsign)
     if (callsign and re.search(r"^[A-Za-z]{1,2}\d[A-Za-z]{1,3}$",callsign)):
-        addLicenses(licenses,callsign)
+        tryAgainCallsign = addLicenses(licenses,callsign)
 
     if (frn and frn.isdecimal() and (len(frn) == 10)):
-        addLicenses(licenses,frn)
+        tryAgainFRN = addLicenses(licenses,frn)
 
     licenses = filterEntries(licenses,callsign,frn)
+
+    resultPayload["tryAgain"] = (tryAgainFRN or tryAgainCallsign)
+    resultPayload["licenses"] = licenses
 
 else: 
     corsValue = None
@@ -257,5 +269,5 @@ if (corsValue):
     print("Access-Control-Allow-Origin: " + corsValue)
 print("")
 
-print(json.JSONEncoder().encode(licenses))
+print(json.JSONEncoder().encode(resultPayload))
 
