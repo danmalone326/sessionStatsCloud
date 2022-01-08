@@ -10,7 +10,8 @@ debugCLI = False
 
 ulsSearchUrlPrefix = "https://data.fcc.gov/api/license-view/basicSearch/getLicenses?sortColumn=expiredDate&format=json&searchValue="
 
-data = []
+licenses = []
+resultPayload = {}
 
 ### TEST AND PROD SHARE A CACHE
 cacheDbPath = "../../data/ulsCache.db"
@@ -144,6 +145,7 @@ def queryULS(searchValue):
 
 def getULS(searchValue):
     result = None
+    tryAgain = False
 
     if (cacheNeedsRefresh(searchValue)):
         if debug:
@@ -154,49 +156,53 @@ def getULS(searchValue):
                 print("good status, update cache")
             updateCache(searchValue,ulsResult)
             result = ulsResult
-        elif (not cacheExists(searchValue)):
-            if debug:
-                print("error but no cache")
-            result = ulsResult
-    
+        else:
+            tryAgain = True
+            if (not cacheExists(searchValue)):
+                if debug:
+                    print("error but no cache")
+                result = ulsResult
+        
     if (result is None):
         if debug:
             print("no result yet, get cache")
         result = getCache(searchValue)
 
-    return result
+    return result, tryAgain
 
-def licenseExists(data,licenseID):
+def licenseExists(licenses,licenseID):
     exists = False
-    for license in data:
+    for license in licenses:
         if (("licenseID" in license) and (license["licenseID"] == licenseID)):
             exists = True
             break
     return exists
 
-def addUniqueEntries(data,newData):
-    for license in newData["Licenses"]["License"]:
-        if (((license["serviceDesc"] == "Amateur") or (license["serviceDesc"] == "Vanity")) and (not licenseExists(data,license["licenseID"]))):
-            data.append(license)
+def addUniqueEntries(licenses,ulsData):
+    for license in ulsData["Licenses"]["License"]:
+        if (((license["serviceDesc"] == "Amateur") or (license["serviceDesc"] == "Vanity")) and (not licenseExists(licenses,license["licenseID"]))):
+            licenses.append(license)
 
-def addError(data,newData):
-    data.append(newData)
+def addError(licenses,ulsData):
+    licenses.append(ulsData)
 
-def addLicenses(data,searchValue):
-    newData = getULS(searchValue)
+def addLicenses(licenses,searchValue):
+    ulsData, tryAgain = getULS(searchValue)
     # ignoring errors for now, but here's where to deal with them if needed
-    if ("status" in newData):
-        if (newData["status"] == "OK"):
-            addUniqueEntries(data,newData)
+    if ("status" in ulsData):
+        if (ulsData["status"] == "OK"):
+            addUniqueEntries(licenses,ulsData)
     else:
-        addError(data,newData)
+        addError(licenses,ulsData)
+    
+    return tryAgain
 
-def filterEntries(data,callsign,frn):
-    newData = []
-    for license in data:
+def filterEntries(licenses,callsign,frn):
+    newLicenses = []
+    for license in licenses:
         if (("Errors" in license) or (callsign and license["callsign"] == callsign) or (frn and license["frn"] == frn)):
-            newData.append(license)
-    return newData
+            newLicenses.append(license)
+    return newLicenses
 
 
 if (debug): 
@@ -228,14 +234,20 @@ if (debug or (result and (len(result.groups()) == 1))):
         frn = form.getfirst('frn')
         callsign = form.getfirst('callsign')
 
+    tryAgainCallsign = False
+    tryAgainFRN = False
+
 # /^[A-Z]{1,2}\d[A-Z]{1,3}$/   re.search(r"^[A-Z]{1,2}\d[A-Z]{1,3}$",callsign)
     if (callsign and re.search(r"^[A-Za-z]{1,2}\d[A-Za-z]{1,3}$",callsign)):
-        addLicenses(data,callsign)
+        tryAgainCallsign = addLicenses(licenses,callsign)
 
     if (frn and frn.isdecimal() and (len(frn) == 10)):
-        addLicenses(data,frn)
+        tryAgainFRN = addLicenses(licenses,frn)
 
-    data = filterEntries(data,callsign,frn)
+    licenses = filterEntries(licenses,callsign,frn)
+
+    resultPayload["tryAgain"] = (tryAgainFRN or tryAgainCallsign)
+    resultPayload["licenses"] = licenses
 
 else: 
     corsValue = None
@@ -257,5 +269,5 @@ if (corsValue):
     print("Access-Control-Allow-Origin: " + corsValue)
 print("")
 
-print(json.JSONEncoder().encode(data))
+print(json.JSONEncoder().encode(resultPayload))
 

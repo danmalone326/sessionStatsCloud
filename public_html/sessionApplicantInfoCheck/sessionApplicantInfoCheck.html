@@ -37,7 +37,7 @@ var applicantCheckIDPrefix = "applicantCheck"; // append PIN to this
 window.sessionData = [];
 var etDataKey = "etData";
 var ulsDataKey = "ulsData";
-var pendingKey = "pending";
+var oneOffKey = "oneOff";
 
 var matchValueClass = "matchValue";
 var similarValueClass = "similarValue";
@@ -60,19 +60,33 @@ function checkDisplayWarning() {
 
 var progressDivID = "progress";
 var jsonRequestQueue = [];
+var nextRequestQueue = [];
 var waitingForJSONCallback = false;
+var totalPasses = 0;             // total number of passes have been attempted
+var lastPassLength = 0;          // number of requests in the last pass
+var passCountUnchangedCount = 0; // used to detect is we are making progress on retries
 
 function updateProgress() {
 	var htmlOutput = "";
 
-	if (jsonRequestQueue.length == 0) {
+	if ((jsonRequestQueue.length + nextRequestQueue.length) == 0) {
 		document.getElementById(progressDivID).style.display = 'none';
 		document.getElementById(progressDivID).innerHTML = "You should not see this.";
 	} else {
 		htmlOutput += "<center>";
-			htmlOutput += "Requests remaining: " + jsonRequestQueue.length + "<br>";
-			for (let i = 0; i < jsonRequestQueue.length; i++) {
-				htmlOutput += jsonRequestQueue[i]["url"] + "<br>";
+			if (jsonRequestQueue.length > 0) {
+				htmlOutput += "Pass " + totalPasses + ": Current requests remaining: " + jsonRequestQueue.length + "<br>";
+				for (let i = 0; i < jsonRequestQueue.length; i++) {
+					htmlOutput += jsonRequestQueue[i]["url"] + "<br>";
+				}
+			} else {
+				htmlOutput += "Failed to load all data after " + totalPasses + " passes, try again.<br>";
+			}
+			if (nextRequestQueue.length > 0) {
+				htmlOutput += "Next pass requests remaining: " + nextRequestQueue.length + "<br>";
+				for (let i = 0; i < nextRequestQueue.length; i++) {
+					htmlOutput += nextRequestQueue[i]["url"] + "<br>";
+				}
 			}
 		htmlOutput += "</center>";
 
@@ -83,13 +97,16 @@ function updateProgress() {
 
 function clearJSONRequests() {
 	jsonRequestQueue = [];
+    nextRequestQueue = [];
+    waitingForJSONCallback = false;
+    totalPasses = 0;
+    lastPassLength = 0;
+    passCountUnchangedCount = 0;
 }
 
 function addJSONRequest(url,index,name) {
-	window.sessionData.applicants[index].data[pendingKey]++;
-	jsonRequestQueue.push({"url": url, "index": index, "name": name});
+	nextRequestQueue.push({"url": url, "index": index, "name": name});
 	updateProgress();
-	doNextJSONRequest();
 }
 
 function getNextJSONRequest() {
@@ -122,14 +139,38 @@ function jsonCallback(err, data, index, name) {
 	} else {
 		result = data;
 		window.sessionData.applicants[index].data[name] = result;
+
+		// special case for retrying uls lookups
+		if (name == ulsDataKey) {
+			if (("tryAgain" in data) && (data["tryAgain"])) {
+				loadUlsData(index);
+			}
+		}
 	}
-	if (--window.sessionData.applicants[index].data[pendingKey] <= 0) {
-		outputApplicantData(index);
-	}
+	outputApplicantData(index);
 
 	updateProgress();
 	doNextJSONRequest();
 };
+
+function doNextRequestPass() {
+	if (nextRequestQueue.length > 0) {
+		totalPasses++;
+		// first check if we are at least making some progress. 
+		if (nextRequestQueue.length == lastPassLength) {
+			passCountUnchangedCount++;
+		} else {
+			passCountUnchangedCount = 0;
+			lastPassLength = nextRequestQueue.length;
+		}
+		if (passCountUnchangedCount <= 3) {
+			jsonRequestQueue = nextRequestQueue;
+			nextRequestQueue = [];
+			updateProgress();
+			doNextJSONRequest();
+		}
+	}
+}
 
 function doNextJSONRequest() {
 	if (!waitingForJSONCallback) {
@@ -137,6 +178,8 @@ function doNextJSONRequest() {
 
 		if (request) {
 			getJSON(request.url, request.index, request.name, jsonCallback);
+		} else {
+			doNextRequestPass();
 		}
 	}
 }
@@ -171,16 +214,11 @@ function loadApplicantData(index) {
 	var jsonURL;
 	var applicationData = window.sessionData.applicants[index];
 	applicationData.data = {};
-	applicationData.data[pendingKey] = 0;
 
 	loadUlsData(index);
-	loadEtData(index);
-}
-
-function retryUls(index) {
-	loadUlsData(index);
-	var divID = applicantCheckIDPrefix + index;
-	document.getElementById(divID).innerHTML = "Retrying...";
+	if (!(oneOffKey in applicationData)) {
+		loadEtData(index);
+	}
 }
 
 // function to normalize values for comparison
@@ -452,14 +490,16 @@ function ulsCheckHTML(index) {
 	if (ulsDataKey in applicationData.data) {
 
 		var applicantUlsData = applicationData.data[ulsDataKey];
+		var applicantUlsLicenses = applicantUlsData["licenses"]
 
 		htmlOutput += "<h3>ULS Entries</h3>";
 
-		if (applicantUlsData.length == 0) {
+		if (applicantUlsLicenses.length == 0) {
 			htmlOutput += "No Amateur Licenses found in ULS for this FRN or Callsign.";
 		} else {
 
-			htmlOutput += "<table><tr><td>";
+			if (!(oneOffKey in applicationData)) {
+				htmlOutput += "<table><tr><td>";
 				htmlOutput += "<span style='font-weight: bold'>Updated ULS address will be:</span><br>";
 				htmlOutput += applicationData.lastname 
 							+ (applicationData.suffix ? " " + applicationData.suffix : "")
@@ -467,7 +507,8 @@ function ulsCheckHTML(index) {
 							+ " " + applicationData.middle + "<br>";
 				htmlOutput += applicationData.addr + "<br>";
 				htmlOutput += applicationData.city + ", " + applicationData.state + " " + applicationData.zip + "<br>";
-			htmlOutput += "</td></tr></table>";
+				htmlOutput += "</td></tr></table>";
+			}
 
 			htmlOutput += "<table class='coresTable'>";
 
@@ -478,7 +519,7 @@ function ulsCheckHTML(index) {
 			htmlOutput += "<th></th>";
 			htmlOutput += "</tr>";
 
-			applicationData.data[ulsDataKey].forEach(function (item, index2) {
+			applicantUlsLicenses.forEach(function (item, index2) {
 				htmlOutput += "<tr>";
 				
 				if ("Errors" in item) {
@@ -489,7 +530,6 @@ function ulsCheckHTML(index) {
 					} catch(e) {
 						htmlOutput += "unknown"
 					}
-					htmlOutput += " <button onClick='retryUls(" + index + ")'>Retry</button>";
 					htmlOutput += "</td>";
 
 				} else {  // a license
@@ -563,17 +603,23 @@ function coresCheckHTML(index) {
 	var htmlOutput = "";
 	var applicationData = window.sessionData.applicants[index];
 
-	htmlOutput += "<h3>CORES Entry</h3>";
-	htmlOutput += "<table class='coresTable'><tr>";
-	htmlOutput += "<td>" + applicationData.lastname 
-						+ ", " + applicationData.firstname 
-						+ " " + applicationData.middle
-						+ (applicationData.suffix ? " " + applicationData.suffix : "")
-						+ "</td>";
-	htmlOutput += "<td>";
-	htmlOutput += coresFrnSearchHTML(applicationData.frn);
-	htmlOutput += "</td>";
-	htmlOutput += "</tr></table>";
+	if (applicationData.frn != '') {
+		htmlOutput += "<h3>CORES Entry</h3>";
+		htmlOutput += "<table class='coresTable'><tr>";
+
+		if (!(oneOffKey in applicationData)) {
+			htmlOutput += "<td>" + applicationData.lastname 
+								+ ", " + applicationData.firstname 
+								+ " " + applicationData.middle
+								+ (applicationData.suffix ? " " + applicationData.suffix : "")
+								+ "</td>";
+		}
+
+		htmlOutput += "<td>";
+		htmlOutput += coresFrnSearchHTML(applicationData.frn);
+		htmlOutput += "</td>";
+		htmlOutput += "</tr></table>";
+	}
 
 	return htmlOutput;
 }
@@ -581,10 +627,12 @@ function coresCheckHTML(index) {
 
 function outputApplicantData(index) {
 	var htmlOutput = "";
-	var applicant = window.sessionData.applicants[index];
+	var applicationData = window.sessionData.applicants[index];
 
-	htmlOutput += nameAddressSimpleCheck(index);
-	htmlOutput += whatETSeesHTML(index);
+	if (!(oneOffKey in applicationData)) {
+		htmlOutput += nameAddressSimpleCheck(index);
+		htmlOutput += whatETSeesHTML(index);
+	}
 	htmlOutput += ulsCheckHTML(index);
 	htmlOutput += coresCheckHTML(index);
 	
@@ -623,13 +671,19 @@ function outputApplicants() {
 		htmlOutput += "<div id=\"" + divID +"\">Loading...</div>";
 
 		htmlOutput += "<hr>";
-
-		loadApplicantData(index);
 	});
 
 	htmlOutput += "</center>";
 
 	document.getElementById(outputID).innerHTML = htmlOutput;
+
+	window.sessionData.applicants.forEach(function (item, index) {
+		loadApplicantData(index);
+		outputApplicantData(index);
+	});
+
+	// start processing requests
+	doNextJSONRequest();
 }
 
 //loadDataFileName
@@ -655,7 +709,6 @@ function dataFileNameUpdated() {
 	}
   }	
 }
-
 function searchOne() {
 	var frn=document.getElementById('frnInput').value.trim();
 	var callsign=document.getElementById('callsignInput').value.trim().toUpperCase();
@@ -668,85 +721,15 @@ function searchOne() {
 	}
 
 	if ((frn != "") || (callsign != "")) {
-		var jsonURL = licenseSearchURLPrefix;
-		if (frn != "") {
-			jsonURL += "frn=" + frn;
-			if (callsign != "") {
-				jsonURL += "&";
-			}
-		}
-		if (callsign != "") {
-			jsonURL += "callsign=" + callsign;
-		}
-
-		jsonRequestQueue.push({"url": jsonURL, "index": -1, "name": -1});
-		updateProgress();
-
-		getJSON(jsonURL,frn,callsign,displayOne);
-		// addJSONRequest(jsonURL, index, ulsDataKey);
+		window.sessionData = {"applicants": [{"callsign": callsign, 
+											  "frn": frn, 
+											  "pin": "N/A",
+											  [oneOffKey]: true
+											}]};
+		outputApplicants();
 	} else {
 		displayErrorOutput();
 	}
-}
-
-function displayOne(err, data, frn, callsign) {
-	var htmlOutput = "";
-
-	jsonRequestQueue.shift();
-	updateProgress();
-
-	if (err !== null) {
-		console.log('Something is odd in displayOne: ' + err + ", index: " + index + ", name: " + name);
-	} else {
-		htmlOutput += "<center>"
-		htmlOutput += "<table class='coresTable'>";
-		htmlOutput += "<tr>";
-		htmlOutput += "<th>FRN</th>";
-		htmlOutput += "<th>Call Sign</th>";
-		htmlOutput += "<th>Status</th>";
-		htmlOutput += "<th></th>";
-		htmlOutput += "</tr>";
-
-		data.forEach(function (item, index) {
-			item.licDetailURL = item.licDetailURL.replace("http://","https://");
-			htmlOutput += "<tr>";
-
-			dataClass = matchValueClass;
-			if (item.frn !== frn){
-				dataClass = differentValueClass;
-			}
-			htmlOutput += "<td class='" + dataClass + "'>" + item.frn + "</td>";
-
-			dataClass = matchValueClass;
-			if (item.callsign !== callsign) {
-				dataClass = differentValueClass;
-			}
-			htmlOutput += "<td class='" + dataClass + "'>" + item.callsign + "</td>";
-
-			htmlOutput += "<td>" + item.statusDesc + "</td>";
-
-			var formID = coresFormPrefix + "-" + item.licenseID;
-			htmlOutput += "<td>";
-			htmlOutput += "<form id='" + formID + 
-							"' target='" + coresPopupTarget + 
-							"' action='" + item.licDetailURL + 
-							"' method='POST' >";
-			htmlOutput += "<button onclick='coresPopup(\"" + formID + "\")'>Open ULS Entry</button>";
-			htmlOutput += "</td>";
-			htmlOutput += "</form>";
-			htmlOutput += "</tr>";
-		});
-
-		htmlOutput += "</table>"
-
-		if (frn && (frn != "")) {
-			htmlOutput += "<br>";
-			htmlOutput += coresFrnSearchHTML(frn);
-		}
-		htmlOutput += "</center>"
-	}
-
-	document.getElementById(outputID).innerHTML = htmlOutput;
 }
 
 function displayErrorOutput(message) {
@@ -786,10 +769,10 @@ td {
 	position: absolute;
 	top: 0;
 	left: 0;
-	width: 100%;
+	width: 90%;
 	z-index: 10;
 	background-color: rgba(0,0,0,0.5);
-	padding: 25px;
+	padding: 5%;
 }
 #testWarning {
 	width: 50%;
