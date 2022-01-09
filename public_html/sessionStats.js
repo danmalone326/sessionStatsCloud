@@ -156,41 +156,55 @@ var myWordCloud = wordCloud("#svgWrapperDiv");
 function wordsByCallsign(stats) {
 	var words = [];
 
+	// must have at least this many sessions to be included in stats
+	var statSessionCountRequired = 1;
+
 	// first find the max and min values and standings
-	var standing = {};
+	var coolStats = {};
 	var minSessions = 999;
 	var maxSessions = 0;
+	var totalWords = 0;
 	stats.forEach(function (i) {
-		if (i.overallSessionCount > maxSessions) { maxSessions = i.overallSessionCount; }
-		if (i.overallSessionCount < minSessions) { minSessions = i.overallSessionCount; }
-		if (i.overallSessionCount in standing) {standing[i.overallSessionCount]+=1} else {standing[i.overallSessionCount]=1}
+		if (i.overallSessionCount >= statSessionCountRequired) {
+			totalWords += 1;
+			if (i.overallSessionCount > maxSessions) { maxSessions = i.overallSessionCount; }
+			if (i.overallSessionCount < minSessions) { minSessions = i.overallSessionCount; }
+			if (i.overallSessionCount in coolStats) {
+				coolStats[i.overallSessionCount].count += 1;
+			} else {
+				coolStats[i.overallSessionCount] = {};
+				coolStats[i.overallSessionCount].count = 1;
+			}
+		}
 	});
 	
-	// Needed a reverse sort, but this was easier
-	var tempArray = [];
-	for (var key in standing) {
-		tempArray.push(key);
+	// calculate the stats for each session count
+	for (var key in coolStats) {
+		coolStats[key].countHigher = 0;
+		coolStats[key].countLower = 0;
+		for (var key2 in coolStats) {
+			if (parseInt(key) > parseInt(key2)) {
+				coolStats[key].countLower += coolStats[key2].count;
+			} else if (parseInt(key) < parseInt(key2)) {
+				coolStats[key].countHigher += coolStats[key2].count;
+			}
+		}
+		coolStats[key].place = coolStats[key].countHigher + 1;
+		coolStats[key].percentile = coolStats[key].countHigher / totalWords * 100;
+		coolStats[key].percentileRank = coolStats[key].percentile / (100 * (totalWords+1));
 	}
-	
-	var currentStanding=1;
-	while (tempArray.length) {
-		key = tempArray.pop();
-		temp = standing[key];
-		standing[key] = currentStanding;
-		currentStanding += temp;
-	}
-	// end of standings	
+	// console.log(coolStats);
 
 	// create word entries and compute size, color, and rotation for each VE
 	stats.forEach(function (i, count) {
-		if (i.overallSessionCount > 0) {		
+		if (i.overallSessionCount >= statSessionCountRequired) {		
 			var word = {
 					"text": i.veCallSign, 
 					"size": (i.overallSessionCount / (maxSessions-minSessions+1) * (fontSizeMax-fontSizeMin))+fontSizeMin,
 					"color": getColor(i,count),
 					"rotate": (Math.floor(Math.random() * rotateStops) * (rotateMax-rotateMin) / (rotateStops-1)) + rotateMin,
 					"tooltip": [i.veNumber+"-"+i.veCallSign+" "+i.vePreferredName,
-								i.overallSessionCount + " (" + nth(standing[i.overallSessionCount]) + ")",
+								i.overallSessionCount + " (" + nth(coolStats[i.overallSessionCount].place) + " - top " + Math.ceil(coolStats[i.overallSessionCount].percentile) +"%)",
 								i.remoteSessionCount,
 								i.applicantCount,
 								i.newLicenses+i.newUpgrades].join(),
