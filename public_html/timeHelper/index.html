@@ -1,0 +1,211 @@
+<html>
+<head>
+<link rel="icon" href="https://glaarg.org/wp-content/uploads/2018/05/cropped-glaarglogoyellowblack-32x32.jpg" sizes="32x32" />
+<link rel="icon" href="https://glaarg.org/wp-content/uploads/2018/05/cropped-glaarglogoyellowblack-192x192.jpg" sizes="192x192" />
+<link rel="apple-touch-icon" href="https://glaarg.org/wp-content/uploads/2018/05/cropped-glaarglogoyellowblack-180x180.jpg" />
+
+<script>
+
+var timeZones = [
+  'Europe/Madrid',
+  'UTC',
+  'America/Puerto_Rico',
+  'US/Eastern',
+  'US/Central',
+  'US/Mountain',
+  'US/Arizona',
+  'US/Pacific',
+  'US/Alaska',
+  'US/Hawaii',
+  'Pacific/Guam'
+];
+
+var defaultTimeZones = [
+  'US/Eastern',
+  'US/Central',
+  'US/Mountain',
+  'US/Pacific'
+]
+
+function timezoneOptionsHtml(id,defaultTimeZones) {
+  htmlOutput = "";
+
+  for (index = 0; index < timeZones.length; index++) {
+    tz = timeZones[index];
+    htmlOutput += "<option value=\"" + tz + "\" ";
+    if (defaultTimeZones.includes(tz)) {
+      htmlOutput += "selected";
+    }
+    htmlOutput += ">" + tz + "</option>";
+  }
+  document.getElementById(id).innerHTML = htmlOutput;
+}
+
+function formToggle() {
+  var x = document.getElementById("form");
+  if (x.style.display === "none") {
+    x.style.display = "block";
+  } else {
+    x.style.display = "none";
+  }
+}
+
+function tzAbbreviation(tzName) {
+  result = (tzName.includes('/') ? tzName.split('/')[1] : tzName).replace('_',' ');
+  return result;
+}
+
+function convertTZ(date, tzString) {
+    return date.toLocaleString("en-US", {timeZone: tzString});   
+}
+
+function readDateField(id) {
+    // get the field value
+    var dateTime = document.getElementById(id).value;
+
+    // get the current date/time to get the local timezone
+    var now = new Date();
+    var nowDateStr = now.toISOString().split("T")[0];
+    var offset = now.getTimezoneOffset();
+    var offsetHours = Math.floor(offset/60);
+    var offsetMinutes = offset - (offsetHours*60);
+    var sign = (offsetHours>0 ? "-" : "+");
+    var offsetHoursAbs = Math.abs(offsetHours);
+    var tzOffsetString = sign + (offsetHoursAbs<10 ? "0" : "") + offsetHoursAbs.toString() + ":" + (offsetMinutes<10 ? "0" : "") + offsetMinutes.toString();
+
+    // add the timezone to the local string
+    var withTZ = dateTime + tzOffsetString;
+
+    // convert to date type
+    var utcDate = new Date(withTZ);
+
+    return utcDate;
+}
+
+function hourMinute(dateStr) {
+  result = dateStr.split(' ')[1].split(':',2).join(':');
+  result += " ";
+  result += dateStr.split(' ')[2];
+  return result;
+}
+
+var copyTextFieldIDPrefix = "copyText";
+var copyTextFieldCounter = 0;
+
+function escapeHtml(unsafe)
+{
+  return unsafe
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
+
+function textFieldWithCopy(value) {
+  copyTextFieldCounter += 1;
+  thisID = copyTextFieldIDPrefix + copyTextFieldCounter;
+  htmlOutput = "";
+  htmlOutput += "<input type='text' value='" + escapeHtml(value) + "' id='" + thisID + "' readonly> ";
+  htmlOutput += "<button onclick='copyTextField(\"" + thisID + "\")'>Copy</button>";
+  return htmlOutput;
+}
+
+function copyTextField(id){
+  /* Get the text field */
+  var copyText = document.getElementById(id);
+
+  /* Select the text field */
+  copyText.select();
+  copyText.setSelectionRange(0, 99999); /* For mobile devices */
+
+  /* Copy the text inside the text field */
+  navigator.clipboard.writeText(copyText.value);
+}
+
+function multiTimeHtml(date,tzList) {
+  htmlOutput = "";
+  htmlOutput += "<h2>For copy and paste into emails or web forms</h2>";
+  for (var index = 0; index < tzList.length; index++) {
+    displayDate = convertTZ(date,tzList[index]);
+    htmlOutput += "<span class=leftTime>" + hourMinute(displayDate) + "</span>";
+    htmlOutput += "<span class=rightTime>" + "&nbsp;(" + tzAbbreviation(tzList[index]) + ")</span>";
+    htmlOutput += "<br>";
+  }
+  htmlOutput += "<hr>";
+
+  unixTime = Math.floor(date.getTime() / 1000);
+  htmlOutput += "<h2>Special Discord time formats</h2>";
+  htmlOutput += "Copy and paste these into your discord message to have the time automatically converted into the viewers time zone."
+  htmlOutput += "<ul>";
+  htmlOutput += "<li>Date and time in the users local time<br>similar to: October 21, 2015 7:28 PM<br>";
+  htmlOutput += textFieldWithCopy("<t:" +  unixTime + ">") + "<br><br>";
+  htmlOutput += "<li>Include the weekday<br>similar to: Wednesday, October 21, 2015 7:28 PM<br>";
+  htmlOutput += textFieldWithCopy("<t:" +  unixTime + ":F>") + "<br><br>";
+  htmlOutput += "<li>Just the time<br>similar to: 7:28 PM<br>";
+  htmlOutput += textFieldWithCopy("<t:" +  unixTime + ":t>") + "<br><br>";
+  htmlOutput += "<li>How long until<br>similar to: in 5 days or in 3 hours or 5 days ago<br>";
+  htmlOutput += textFieldWithCopy("<t:" +  unixTime + ":R>") + "<br><br>";
+  htmlOutput += "<li>Combine multiple together<br>similar to: Wednesday, October 21, 2015 7:28 PM, in 5 days<br>";
+  htmlOutput += textFieldWithCopy("<t:" +  unixTime + ":F>, <t:" +  unixTime + ":R>") + "<br><br>";
+  htmlOutput += "</ul>";
+  return htmlOutput;
+}
+
+function refresh() {
+  selectedTime = readDateField("selectedTime");
+  selectedOptions = document.getElementById("selectedTimeZones").options;
+  selectedTimeZones = [];
+  for (var i=0; i<selectedOptions.length; i++) {
+    option = selectedOptions[i];
+    if (option.selected) {
+      selectedTimeZones.push(option.value);
+    }
+  }
+
+  document.getElementById("output").innerHTML = multiTimeHtml(selectedTime,selectedTimeZones);
+}
+
+function onLoad() {
+  now = new Date().toLocaleString('sv').split(" ",2).join('T');
+  document.getElementById("selectedTime").value = now;
+  timezoneOptionsHtml('selectedTimeZones',defaultTimeZones);
+  refresh();
+}
+
+</script>
+
+<style type="text/css">
+
+.leftTime {
+  float: left;
+  text-align: right;
+  width: 6em;
+}
+
+.rightTime {
+  text-align: left;
+  width: 10em;
+}
+
+
+</style>
+
+<title>GLAARG Time Helper</title>
+</head>
+
+<body onload="onLoad();">
+  <h1>GLAARG Time Helper</h1>
+  <div id="form">
+      <form>
+          Times entered here is in this computers local time zone: <br>
+          Time to convert: <input id="selectedTime" type="datetime-local" onchange="refresh();"><br>
+          Time Zones to Display: (Ctrl or Cmd &#8984; to select multiple) <br>
+          <select id='selectedTimeZones' multiple onchange='refresh();'></select>
+      </form>
+      <hr>
+  </div>
+  <div id="output">
+  </div>
+</body>
+</html>
