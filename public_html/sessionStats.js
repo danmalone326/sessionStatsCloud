@@ -1,5 +1,6 @@
 
 var jsonURL = "https://glaarglookup.n1cck.com/websiteStatsDetail"
+// var jsonURL = "https://velookup.glaarg.org/websiteStatsDetail"
 // var jsonURL = "sessionStats.json"
 
 var fontSizeMin = 10;
@@ -47,6 +48,7 @@ function loadJSON (url) {
 
 
 var rankColors = [
+	{"rank": 400, "color": "rgb(255, 95, 31)"},
 	{"rank": 300, "color": "rgb(255, 105, 180)"},
 	{"rank": 250, "color": "rgb(153, 102, 204)"},
 	{"rank": 200, "color": "rgb(100, 149, 237)"},
