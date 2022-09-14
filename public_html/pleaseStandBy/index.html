@@ -1,0 +1,290 @@
+<html>
+<head>
+<title>GLAARG Session Please Stand By</title>
+<link rel="icon" href="https://glaarg.org/wp-content/uploads/2018/05/cropped-glaarglogoyellowblack-32x32.jpg" sizes="32x32" />
+<link rel="icon" href="https://glaarg.org/wp-content/uploads/2018/05/cropped-glaarglogoyellowblack-192x192.jpg" sizes="192x192" />
+<link rel="apple-touch-icon" href="https://glaarg.org/wp-content/uploads/2018/05/cropped-glaarglogoyellowblack-180x180.jpg" />
+
+<script>
+
+var timeZones = [
+  'Europe/Madrid',
+  'UTC',
+  'America/Puerto_Rico',
+  'US/Eastern',
+  'US/Central',
+  'US/Mountain',
+  'US/Arizona',
+  'US/Pacific',
+  'US/Alaska',
+  'US/Hawaii',
+  'Pacific/Guam'
+];
+
+var defaultTimeZones = [
+  'US/Eastern',
+  'US/Central',
+  'US/Mountain',
+  'US/Pacific'
+]
+
+function timezoneOptionsHtml(id,defaultTimeZones) {
+  htmlOutput = "";
+
+  for (index = 0; index < timeZones.length; index++) {
+    tz = timeZones[index];
+    htmlOutput += "<option value=\"" + tz + "\" ";
+    if (defaultTimeZones.includes(tz)) {
+      htmlOutput += "selected";
+    }
+    htmlOutput += ">" + tz + "</option>";
+  }
+  document.getElementById(id).innerHTML = htmlOutput;
+}
+
+function formToggle() {
+  var x = document.getElementById("form");
+  if (x.style.display === "none") {
+    x.style.display = "block";
+  } else {
+    x.style.display = "none";
+  }
+}
+
+function tzAbbreviation(tzName) {
+  result = (tzName.includes('/') ? tzName.split('/')[1] : tzName).replace('_',' ');
+  return result;
+}
+
+function convertTZ(date, tzString) {
+    return date.toLocaleString("en-US", {timeZone: tzString});   
+}
+
+function getDates() {
+    var veStartTime = document.getElementById("veStartTime").value;
+    var now = new Date();
+    var nowDateStr = now.toISOString().split("T")[0];
+    var offset = now.getTimezoneOffset();
+    var offsetHours = Math.floor(offset/60);
+    var offsetMinutes = offset - (offsetHours*60);
+    var sign = (offsetHours>0 ? "-" : "+");
+    var offsetHoursAbs = Math.abs(offsetHours);
+    var tzOffsetString = sign + (offsetHoursAbs<10 ? "0" : "") + offsetHoursAbs.toString() + ":" + (offsetMinutes<10 ? "0" : "") + offsetMinutes.toString();
+    var withTZ = veStartTime + tzOffsetString;
+
+    var timezoneStr = new Date(withTZ).toLocaleTimeString('en-us',{timeZoneName:'short'}).split(' ')[2];
+    document.getElementById("timezone").innerHTML = timezoneStr;
+
+    console.log(veStartTime);
+    console.log(offset);
+    console.log(withTZ);
+    var utcDate = new Date(withTZ);
+
+    console.log(utcDate);
+
+    for (index = 0; index < timeZones.length; index++) {
+        console.log(timeZones[index]);
+        console.log(convertTZ(utcDate,timeZones[index]));
+    }
+}
+
+function readDateField(id) {
+    // get the field value
+    var veStartTime = document.getElementById(id).value;
+
+    // get the current date/time to get teh local timezone
+    var now = new Date();
+    var nowDateStr = now.toISOString().split("T")[0];
+    var offset = now.getTimezoneOffset();
+    var offsetHours = Math.floor(offset/60);
+    var offsetMinutes = offset - (offsetHours*60);
+    var sign = (offsetHours>0 ? "-" : "+");
+    var offsetHoursAbs = Math.abs(offsetHours);
+    var tzOffsetString = sign + (offsetHoursAbs<10 ? "0" : "") + offsetHoursAbs.toString() + ":" + (offsetMinutes<10 ? "0" : "") + offsetMinutes.toString();
+
+    // add the timezone to the local string
+    var withTZ = veStartTime + tzOffsetString;
+
+    // convert to date type
+    var utcDate = new Date(withTZ);
+
+    return utcDate;
+}
+
+function hourMinute(dateStr) {
+  result = dateStr.split(' ')[1].split(':',2).join(':');
+  result += " ";
+  result += dateStr.split(' ')[2];
+  return result;
+}
+
+function multiTimeHtml(date,tzList) {
+  htmlOutput = "";
+  for (var index = 0; index < tzList.length; index++) {
+    displayDate = convertTZ(date,tzList[index]);
+    htmlOutput += "<span class=leftTime>" + hourMinute(displayDate) + "</span>";
+    htmlOutput += "<span class=rightTime>" + "&nbsp;(" + tzAbbreviation(tzList[index]) + ")</span>";
+    htmlOutput += "<br>";
+  }
+  return htmlOutput;
+}
+
+function refresh() {
+  applicantStartTime = readDateField("applicantStartTime");
+  veStartTime = readDateField("veStartTime");
+  selectedOptions = document.getElementById("timeZoneSelected").options;
+  selectedTimeZones = [];
+  for (var i=0; i<selectedOptions.length; i++) {
+    option = selectedOptions[i];
+    if (option.selected) {
+      selectedTimeZones.push(option.value);
+    }
+  }
+
+  document.getElementById("applicantStartTimeDisplay").innerHTML = multiTimeHtml(applicantStartTime,selectedTimeZones);
+  veTZ = document.getElementById('veTimeZoneSelected').value;
+  document.getElementById("veStartTimeDisplay").innerHTML = hourMinute(convertTZ(veStartTime,veTZ)) + " " + tzAbbreviation(veTZ);
+}
+
+function onLoad() {
+  now = new Date().toLocaleString('sv').split(" ",2).join('T');
+  document.getElementById("applicantStartTime").value = now;
+  document.getElementById("veStartTime").value = now;
+
+  timezoneOptionsHtml('timeZoneSelected',defaultTimeZones);
+  timezoneOptionsHtml('veTimeZoneSelected','US/Pacific');
+  
+  refresh();
+}
+
+</script>
+
+<style type="text/css">
+
+.container {
+  display: grid; 
+  grid-template-columns: 1fr 1fr; 
+  grid-template-rows: 1fr; 
+  gap: 0px 0px; 
+  grid-template-areas: 
+    "left right"; 
+}
+.left { 
+  grid-area: left; 
+  text-align: center;
+  font-family: 'Courier New', monospace;
+}
+.right {
+  display: grid; 
+  grid-template-columns: 1fr; 
+  grid-template-rows: 1fr 0.5fr 0.5fr; 
+  gap: 0px 0px; 
+  grid-template-areas: 
+    "content"
+    "promote"
+    "veContent"; 
+  grid-area: right; 
+}
+.content { 
+  grid-area: content;
+  display: flex;
+  justify-content: center;
+}
+
+.startContainer {
+  width: 12em;
+}
+
+.leftTime {
+  float: left;
+  text-align: right;
+  width: 6em;
+}
+
+.rightTime {
+  text-align: left;
+  width: 10em;
+}
+
+.promote { 
+    grid-area: promote; 
+    text-align: center;
+    font-family: 'Courier New', monospace;
+}
+
+.veContent {
+  grid-area: veContent;
+  display: flex;
+  justify-content: center;
+}
+
+.veStartContainer {
+  width: 12em;
+  text-align: center;
+}
+
+.youtubeEmbed {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+}
+
+.hamstudyLogo {
+    max-width: 239;
+    height: auto;
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+</style>
+
+</head>
+
+<body onload="onLoad();">
+    <div id="form">
+        <form>
+            All times entered are as local time zone: <br>
+            Applicant start time: <input id="applicantStartTime" type="datetime-local" onchange="refresh();"><br>
+            Time Zones to Display for Session Start Time: (Ctrl or Cmd &#8984; to select multiple) <br>
+            <select id='timeZoneSelected' multiple onchange='refresh();'></select><br>
+            <br>
+            VE arrival time: <input id="veStartTime" type="datetime-local" onchange="refresh();"><br>
+            Time Zone to Display for VE Time: 
+            <select id='veTimeZoneSelected' onchange='refresh();'></select><br>
+            <br>
+            Click the GLAARG Logo to hide this form, then resize to fit.
+            <div class='youtubeEmbed'>
+              <iframe width="280" height="160" src="https://www.youtube.com/embed/eFbKKsEoQNg" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+              <br>Press play before hiding the form.
+            </div>
+
+        </form>
+    <hr>
+    </div>
+    <div class="container">
+        <div class="left">
+          <img src="../media/GLAARG-Logo-c.svg" onclick="formToggle();"></img>
+          GLAARG.org
+        </div>
+        <div class="right">
+          <div class="content">
+            <div class="startContainer">
+              <h2>Session begins at:</h2>
+              <span id="applicantStartTimeDisplay"></span>
+            </div>
+          </div>
+          <div class="promote">
+            <img class="hamstudyLogo" src="../media/hamstudy.svg"></img>
+            hamstudy.org
+          </div>
+          <div class="veContent">
+            <div class="veStartContainer">
+              <h3>VEs please arrive at:</h3>
+              <span id="veStartTimeDisplay"></span>
+            </div>
+          </div>
+        </div>
+    </div>
+</body>
+</html>
