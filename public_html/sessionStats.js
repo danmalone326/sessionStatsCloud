@@ -48,6 +48,7 @@ function loadJSON (url) {
 
 
 var rankColors = [
+	{"rank": 500, "color": "rgb(44, 255, 0)"},
 	{"rank": 400, "color": "rgb(255, 95, 31)"},
 	{"rank": 300, "color": "rgb(255, 105, 180)"},
 	{"rank": 250, "color": "rgb(153, 102, 204)"},
