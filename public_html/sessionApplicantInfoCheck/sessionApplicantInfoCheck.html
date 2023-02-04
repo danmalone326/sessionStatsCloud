@@ -15,7 +15,7 @@ var debugSkipLookup = false;
 // https://apps.fcc.gov/coresWeb/searchDetail.do?frn=$FRN
 
 var etApplicantLookupURLPrefix = "https://exam.tools/api/uls/lookup/";
-var coresApplicantLookupURL = "https://apps.fcc.gov/coresWeb/simpleSearch.do?btnSearch=true";
+var coresApplicantLookupURL = "https://apps.fcc.gov/cores/searchDetail.do";
 
 // ULS API does not allow CORS
 // var licenseSearchURLPrefix = "https://data.fcc.gov/api/license-view/basicSearch/getLicenses?sortColumn=expiredDate&format=json&searchValue=";
@@ -591,8 +591,8 @@ function coresFrnSearchHTML(frn) {
 					"' target='" + coresPopupTarget + 
 					"' action='" + coresApplicantLookupURL + 
 					"' method='POST' >";
-	htmlOutput += "<input type=hidden name=simpleSearchName value=Frn>";
-	htmlOutput += "<input type=hidden name=simpleSearchValue value=" + frn + ">";
+	htmlOutput += "<input type=hidden name=csfrToken value=''>";
+	htmlOutput += "<input type=hidden name=frn value=" + frn + ">";
 	htmlOutput += "<button onclick='coresPopup(\"" + formID + "\")'>Open CORES Entry</button>";
 	htmlOutput += "</form>";
 
