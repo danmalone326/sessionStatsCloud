@@ -19,6 +19,12 @@ var svgHeight = 720;
 
 const urlParams = new URLSearchParams(window.location.search);
 
+
+const writeToCache = (url, data) =>
+  localStorage.setItem(url, JSON.stringify(data))
+
+const readFromCache = url => JSON.parse(localStorage.getItem(url)) || null
+
 // Routines for loading the JSON stats file
 var getJSON = function(url, callback) {
 					var xhr = new XMLHttpRequest();
@@ -32,15 +38,24 @@ var getJSON = function(url, callback) {
 							callback(status, xhr.response);
 						}
 					};
+					xhr.onerror = function() { callback('Unknown Error',xhr.response); }
 					xhr.send();
 				};
 
 function loadJSON (url) {
-	getJSON(jsonURL,
+	getJSON(url,
 			function(err, data) {
 				if (err !== null) {
-					alert('Something went wrong: ' + err);
+					data = readFromCache(url)
+					if (data) {
+						gotNewStats(data);
+						alert('Stats not currently available.\nUsing last known values.');
+					} else {
+						console.log('Something went wrong: ' + err);
+						alert('Stats not currently available.');
+					}
 				} else {
+					writeToCache(url,data);
 					gotNewStats(data);
 				}
 			});
