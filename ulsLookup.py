@@ -200,7 +200,7 @@ def addLicenses(licenses,searchValue):
 def filterEntries(licenses,callsign,frn):
     newLicenses = []
     for license in licenses:
-        if (("Errors" in license) or (callsign and license["callsign"] == callsign) or (frn and license["frn"] == frn)):
+        if (("Errors" in license) or (callsign and ("callsign" in license) and license["callsign"] == callsign) or (frn and ("frn" in license) and license["frn"] == frn)):
             newLicenses.append(license)
     return newLicenses
 
