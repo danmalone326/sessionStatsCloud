@@ -1,6 +1,5 @@
 
-// var jsonURL = "https://glaarglookup.n1cck.com/websiteStatsDetail"
-var jsonURL = "https://velookup.glaarg.org/websiteStatsDetail"
+var jsonURL = "https://plexus.glaarg.org/api/v1/websiteStatsDetail"
 // var jsonURL = "sessionStats.json"
 
 var fontSizeMin = 10;
